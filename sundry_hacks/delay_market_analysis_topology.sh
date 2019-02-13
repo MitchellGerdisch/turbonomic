@@ -1,3 +1,10 @@
+#!/bin/sh
+#
+# Modifies customer topology file to delay market analysis for 30 days.
+# Topology file is located: srv/tomcat/data/repos/customer.markets.topology
+#
+
+
 if [ $# -ne 1 ]
 then
 	echo "USAGE: $0 <TOPOLOGY FILE>"
