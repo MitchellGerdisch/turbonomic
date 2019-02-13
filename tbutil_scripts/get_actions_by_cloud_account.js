@@ -8,8 +8,9 @@
  * 2) Download this javascript.
  * 3) Make it executable
  * 4) Run by call it as such:
- *    get_actions_by_cloud_accounts.js -c @TURBO_CREDS_NAME
+ *    get_actions_by_cloud_accounts.js -c @TURBO_CREDS_NAME [-t]
  *    Where TURBO_CREDS_NAME is the name of the creds you set up using tbutil save credentials - see documentation.
+ *    -t: Optional flag to output data in tabular view instead of the default CSV output.
  * 
  * If interested in writing your own javascript that uses tbutil/tubscript, 
  * it is highly recommended you go through the PowerPoint attached to the above link.
@@ -29,14 +30,28 @@
  * 
  */
 
+// Allow a -t option to output as a table instead of a CSV
+var output_type = "csv"
+if (args.length >= 1) {
+	if (args[0] == "-t") {
+		output_type = "table"
+	}
+}
+	
+// CSV/table headers
+var headers = [ "Account Name", "Cloud Provider", "Cloud Account ID", "Action to Take", "Target Name", "Target UUID" ]
+var rows = []
+
 // Get the cloud accounts connected to the turbo box
 var opts = {
 		type: "DISCOVERED"
 }
 BUs = client.getBusinessUnits(opts)
 
-var headers = [ "Account Name", "Cloud Provider", "Cloud Account ID", "Action to Take", "Target Name", "Target UUID" ]
-var rows = []
+//if (BUs.length < 1) {
+if (BUs.length > 0) {
+	rows.push(["No cloud accounts found."])
+}
 
 for (var i = 0; i < BUs.length; i +=1) {
 	BU = BUs[i]
@@ -49,6 +64,10 @@ for (var i = 0; i < BUs.length; i +=1) {
 		// Now go and get the actions for each account
 		buActions = client.getCurrentBusinessUnitActions( bu_uuid, {} ) // no options need to be passed 
 		
+		if (buActions.length == 0) {
+			rows.push([bu_displayName, bu_cloudType, bu_uuid, "No actions found for this cloud account", "", ""])
+		}
+		
 		for (var j = 0; j < buActions.length; j +=1) {
 			buAction = buActions[j]
 			action_statement = buAction.details
@@ -60,7 +79,9 @@ for (var i = 0; i < BUs.length; i +=1) {
 	}
 }
 
-//printTable(headers, rows)
-printCsv(headers, rows)
-
+if (output_type == "table") {
+	printTable(headers, rows)
+} else {
+	printCsv(headers, rows)
+}
 return 0;
