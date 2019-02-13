@@ -1,11 +1,21 @@
 #! /usr/bin/env tbscript
 /*
  * This javascript leverages the Turbonomic API client, tbutil and related tbscript capability.
- * See https://greencircle.vmturbo.com/docs/DOC-5897
- * It is highly recommended you go through the PowerPoint attached to the above link.
+ * See https://greencircle.vmturbo.com/docs/DOC-5897 for more information on tbutil.
+ * 
+ * To run the script:
+ * 1) Install tbutil as per the above link. (The README in this folder also has installation steps.)
+ * 2) Download this javascript.
+ * 3) Make it executable
+ * 4) Run by call it as such:
+ *    get_actions_by_cloud_accounts.js -c @TURBO_CREDS_NAME
+ *    Where TURBO_CREDS_NAME is the name of the creds you set up using tbutil save credentials - see documentation.
+ * 
+ * If interested in writing your own javascript that uses tbutil/tubscript, 
+ * it is highly recommended you go through the PowerPoint attached to the above link.
  * Also, the above link provides a link to downloads which includes a REFERENCE.pdf that provides the javascript translation of the APIs.
  * 
- * The PowerPoint covers this as well, but it's worth noting that the 'tbutil' command itself has a nifty "what" option that you can use 
+ * And, although the PowerPoint covers this as well, it's worth noting that the 'tbutil' command itself has a nifty "what" option that you can use 
  * to find the corresponding javascript call for a given API.
  * So if I used Chrome javascript console to find the API call the UI uses when getting a list of actions for a given account, 
  * I can then run this where I have tbutil installed:
