@@ -39,7 +39,7 @@ if (args.length >= 1) {
 }
 	
 // CSV/table headers
-var headers = [ "Account Name", "Cloud Provider", "Cloud Account ID", "Action to Take", "Target Name", "Target UUID" ]
+var headers = [ "Account Name", "Cloud Provider", "Cloud Account ID", "Target Name", "Target UUID", "Action to Take", "Reason for Action" ]
 var rows = []
 
 // Get the cloud accounts connected to the turbo box
@@ -81,7 +81,8 @@ for (var i = 0; i < BUs.length; i +=1) {
 					action_statement = buAction.details
 					target_uuid = buAction.target.uuid
 					target_name = buAction.target.displayName
-					rows.push([bu_displayName, bu_cloudType, bu_uuid, action_statement, target_name, target_uuid])
+					reason = buAction.risk.description
+					rows.push([bu_displayName, bu_cloudType, bu_uuid, target_name, target_uuid, action_statement, reason])
 				}
 			}
 		}
