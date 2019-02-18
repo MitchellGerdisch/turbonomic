@@ -48,8 +48,7 @@ var opts = {
 }
 BUs = client.getBusinessUnits(opts)
 
-//if (BUs.length < 1) {
-if (BUs.length > 0) {
+if (BUs.length < 1) {
 	rows.push(["No cloud accounts found."])
 }
 
@@ -61,21 +60,31 @@ for (var i = 0; i < BUs.length; i +=1) {
 		bu_cloudType = BU.cloudType // AWS, Azure, etc
 		bu_uuid = BU.uuid // The cloud account ID
 		
-		// Now go and get the actions for each account
-		buActions = client.getCurrentBusinessUnitActions( bu_uuid, {} ) // no options need to be passed 
-		
-		if (buActions.length == 0) {
-			rows.push([bu_displayName, bu_cloudType, bu_uuid, "No actions found for this cloud account", "", ""])
-		}
-		
-		for (var j = 0; j < buActions.length; j +=1) {
-			buAction = buActions[j]
-			action_statement = buAction.details
-			target_uuid = buAction.target.uuid
-			target_name = buAction.target.displayName
-			rows.push([bu_displayName, bu_cloudType, bu_uuid, action_statement, target_name, target_uuid])
-		}
+		// limit option limits the number of items in the response.
+		// cursor is the index to the start of the next set of items. cursor=0 => start with the first one; cursor=5 => start with the 6th item
+		var limit = 100
+		var cursor = "0" // start at the beginning
+		while (cursor != "") {
+			var buActions_opts = {
+					limit: limit,
+					cursor: cursor
+			}
+			buActions = client.getCurrentBusinessUnitActions( bu_uuid, buActions_opts ) 
+			cursor = client.nextCursor()
 			
+			if (buActions.length == 0) {
+				rows.push([bu_displayName, bu_cloudType, bu_uuid, "No actions found for this cloud account", "", ""])
+			}
+			else {
+				for (var j = 0; j < buActions.length; j +=1) {
+					buAction = buActions[j]
+					action_statement = buAction.details
+					target_uuid = buAction.target.uuid
+					target_name = buAction.target.displayName
+					rows.push([bu_displayName, bu_cloudType, bu_uuid, action_statement, target_name, target_uuid])
+				}
+			}
+		}
 	}
 }
 
