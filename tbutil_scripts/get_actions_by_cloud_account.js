@@ -49,7 +49,7 @@ var opts = {
 BUs = client.getBusinessUnits(opts)
 
 if (BUs.length < 1) {
-	rows.push(["No cloud accounts found."])
+	rows.push(["No cloud accounts found.", "", "", "", "", "", ""])
 }
 
 for (var i = 0; i < BUs.length; i +=1) {
@@ -73,7 +73,7 @@ for (var i = 0; i < BUs.length; i +=1) {
 			cursor = client.nextCursor()
 			
 			if (buActions.length == 0) {
-				rows.push([bu_displayName, bu_cloudType, bu_uuid, "No actions found for this cloud account", "", ""])
+				rows.push([bu_displayName, bu_cloudType, bu_uuid, "No actions found for this cloud account", "", "", ""])
 			}
 			else {
 				for (var j = 0; j < buActions.length; j +=1) {
