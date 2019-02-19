@@ -70,7 +70,8 @@ for (var i = 0; i < BUs.length; i +=1) {
 			try {
 				var buActions_opts = {
 					limit: limit,
-					cursor: cursor
+					cursor: cursor,
+					ascending: false
 				}
 				buActions = client.getCurrentBusinessUnitActions( bu_uuid, buActions_opts ) 
 				cursor = client.nextCursor()
