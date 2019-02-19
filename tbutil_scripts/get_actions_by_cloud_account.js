@@ -93,7 +93,7 @@ for (var i = 0; i < BUs.length; i +=1) {
 					limit = 1 // If so, go into step-by-step mode to skip over the problem child
 				}
 				else {
-					rows.push([bu_displayName, bu_cloudType, bu_uuid, "*****", cursor, "SKIPPED ITEM", ""])
+					rows.push([bu_displayName, bu_cloudType, bu_uuid, "*****", "SKIPPED ITEM", cursor, ""])
 					cursor = (parseInt(cursor) + 1).toString() // skip over the bad one
 					limit = std_limit // this is needed to reset the limit to the standard value after stepping over a bad one.
 				}
