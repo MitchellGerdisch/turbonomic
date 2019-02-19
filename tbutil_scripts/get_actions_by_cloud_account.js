@@ -62,9 +62,10 @@ for (var i = 0; i < BUs.length; i +=1) {
 		
 		// limit option limits the number of items in the response.
 		// cursor is the index to the start of the next set of items. cursor=0 => start with the first one; cursor=5 => start with the 6th item
-		var std_limit = 25
+		var std_limit = 20
 		var limit = std_limit
 		var cursor = "0" // start at the beginning
+		var bu_first_time = true
 		while (cursor != "") {
 			try {
 				var buActions_opts = {
@@ -73,10 +74,11 @@ for (var i = 0; i < BUs.length; i +=1) {
 				}
 				buActions = client.getCurrentBusinessUnitActions( bu_uuid, buActions_opts ) 
 				cursor = client.nextCursor()
-				if (buActions.length == 0) {
+				if (bu_first_time && (buActions.length == 0)) {
 					rows.push([bu_displayName, bu_cloudType, bu_uuid, "No actions found for this cloud account", "", "", ""])
 				}
 				else {
+					bu_first_time = false
 					for (var j = 0; j < buActions.length; j +=1) {
 						buAction = buActions[j]
 						action_statement = buAction.details
