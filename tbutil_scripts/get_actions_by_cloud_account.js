@@ -62,7 +62,7 @@ for (var i = 0; i < BUs.length; i +=1) {
 		
 		// limit option limits the number of items in the response.
 		// cursor is the index to the start of the next set of items. cursor=0 => start with the first one; cursor=5 => start with the 6th item
-		var std_limit = 100
+		var std_limit = 25
 		var limit = std_limit
 		var cursor = "0" // start at the beginning
 		while (cursor != "") {
