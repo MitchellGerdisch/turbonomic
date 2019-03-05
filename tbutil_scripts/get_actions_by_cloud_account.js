@@ -7,10 +7,13 @@
  * 1) Install tbutil as per the above link. (The README in this folder also has installation steps.)
  * 2) Download this javascript.
  * 3) Make it executable
- * 4) Run by call it as such:
- *    get_actions_by_cloud_accounts.js -c @TURBO_CREDS_NAME [-t]
+ * 4) Run by calling it as such:
+ *    get_actions_by_cloud_accounts.js -c @TURBO_CREDS_NAME [-t] [-m] 
  *    Where TURBO_CREDS_NAME is the name of the creds you set up using tbutil save credentials - see documentation.
  *    -t: Optional flag to output data in tabular view instead of the default CSV output.
+ *    -x: Optional flag to output data as an XLSX file named "turbo_actions_DATE.xlsx"
+ *    -m: Optional flag to output a separate file for each account instead of one big file with all accounts listed in it. 
+ *        If -x option is used, the file names will be of the form "turbo_actions_ACCOUNTNUMBER_TIMESTAMP.xlsx"
  * 
  * If interested in writing your own javascript that uses tbutil/tubscript, 
  * it is highly recommended you go through the PowerPoint attached to the above link.
@@ -30,11 +33,81 @@
  * 
  */
 
-// Allow a -t option to output as a table instead of a CSV
+function usage() {
+	println("")
+	println("Usage is ...")
+	println("")
+	println("get_actions_by_cloud_accounts.js -c @TURBO_CREDS_NAME [-t] [-x [DIRECTORY]] [-m]") 
+	println("")
+	println("-c             Use given Turbonomic instance and creds that were set up using \"tbutil @TURBO_CREDS_NAME save credentials\" command as per tbutil documentation.")
+	println("-t             OPTIONAL: Produce tabular output instead of default CSV output. Output will be to STDOUT.")
+	println("-x             OPTIONAL: Produce XLSX output instead of default CSV output. Output will be placed in a file named \"turbo_actions_TIMESTAMP.xlsx\" where TIMESTAMP represents the current epoch time (seconds).")
+	println("               XLSX file(s) will be placed in optionally specified DIRECTORY")
+	println("-m             OPTIONAL: Produce separate output for each cloud account. ") 
+	println("               If -x option also used, output will be placed in separate files named \"turbo_actions_CLOUDACCOUNT_TIMESTAMP.xlsx\" ")
+	println("               where CLOUDACCOUNT is the cloud account ID, and TIMESTAMP represents the current epoch time (seconds).")
+	println("")
+	println("Notes:")
+	println(" * Default behavior is output in CSV format listing all actions across all accounts.")
+	println("")
+	exit(2)
+}
+
+function output_data(output_type, file_name, headers, rows) {
+	if (output_type == "table") {
+		printTable(headers, rows)
+	} else if (output_type == "csv") {
+		printCsv(headers, rows)
+	} else if (output_type == "xlsx") {
+		println("Generating XLSX file: "+file_name)
+		generate_xls(file_name, headers, rows)
+	} else {
+		println("*** ERROR: Unknown output_type.")
+		exit(3)
+	}
+}
+
+function generate_xls(file_name, headers, rows) {
+	
+	var wb = plugin("excel-plugin").open()
+
+	// Add header
+	wb.addRow("lb", headers)
+	
+	// Now add each row to the spreadsheet
+	rows.forEach(function(row) {
+		wb.addRow("l", row)
+	})
+	
+	wb.save(file_name)
+}
+
 var output_type = "csv"
-if (args.length >= 1) {
-	if (args[0] == "-t") {
-		output_type = "table"
+var file_name_root = "turbo_actions"
+var file_directory = "."
+var per_account_output = false
+
+for (var a = 0; a < args.length; a+=1) {
+	switch (args[a]) {
+		case "-h":
+			usage()
+			break
+		case "-t":
+			output_type = "table"
+			break
+		case "-x":
+			output_type = "xlsx"
+		    file_directory = args[a+1]
+			if (file_directory === undefined)
+				file_directory = "."
+			a+=1
+			break
+		case "-m":
+			per_account_output = true
+			break
+		default:
+			usage()
+			break
 	}
 }
 	
@@ -51,6 +124,10 @@ BUs = client.getBusinessUnits(opts)
 if (BUs.length < 1) {
 	rows.push(["No cloud accounts found.", "", "", "", "", "", ""])
 }
+
+var bu_displayName
+var bu_cloudType
+var bu_uuid
 
 for (var i = 0; i < BUs.length; i +=1) {
 	BU = BUs[i]
@@ -100,12 +177,21 @@ for (var i = 0; i < BUs.length; i +=1) {
 				}
 			}
 		}
+		if (per_account_output == true) {
+			var d = new Date()
+			var datestamp = Math.round(d.getTime() / 1000)
+			file_name = file_directory + "/" + file_name_root + "_" + bu_uuid + "_" + datestamp + ".xlsx"
+			output_data(output_type, file_name, headers, rows)
+			rows = [] // reset the rows for the next account
+		}
 	}
 }
 
-if (output_type == "table") {
-	printTable(headers, rows)
-} else {
-	printCsv(headers, rows)
+if (per_account_output == false) {
+	var d = new Date()
+	var datestamp = Math.round(d.getTime() / 1000)
+	file_name = file_directory + "/" + file_name_root + "_" + datestamp + ".xlsx"
+	output_data(output_type, file_name, headers, rows)
 }
+
 return 0;
