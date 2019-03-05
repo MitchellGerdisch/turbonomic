@@ -33,6 +33,7 @@
  * 
  */
 
+// print out usage instuctions
 function usage() {
 	println("")
 	println("Usage is ...")
@@ -53,6 +54,7 @@ function usage() {
 	exit(2)
 }
 
+// output the data in the specified format
 function output_data(output_type, file_name, headers, rows) {
 	if (output_type == "table") {
 		printTable(headers, rows)
@@ -67,6 +69,7 @@ function output_data(output_type, file_name, headers, rows) {
 	}
 }
 
+// output an xlsx file of the data
 function generate_xls(file_name, headers, rows) {
 	
 	var wb = plugin("excel-plugin").open()
@@ -80,6 +83,21 @@ function generate_xls(file_name, headers, rows) {
 	})
 	
 	wb.save(file_name)
+}
+
+// Get the savings information from an action object
+function get_savings(action) {
+	
+	var savings = "N/A"
+	var stats = action.stats
+	stats.forEach(function(stat) {
+		if (stat.name == "costPrice") {
+			if (stat.filters[0].type == "savingsType") {
+				savings = stat.value
+			}
+		}
+	})
+	return savings
 }
 
 var output_type = "csv"
@@ -112,7 +130,7 @@ for (var a = 0; a < args.length; a+=1) {
 }
 	
 // CSV/table headers
-var headers = [ "Account Name", "Cloud Provider", "Cloud Account ID", "Target Name", "Target UUID", "Action to Take", "Reason for Action" ]
+var headers = [ "Account Name", "Cloud Provider", "Cloud Account ID", "Savings ($/h)", "Target Name", "Target UUID", "Action to Take", "Reason for Action" ]
 var rows = []
 
 // Get the cloud accounts connected to the turbo box
@@ -156,6 +174,7 @@ for (var i = 0; i < BUs.length; i +=1) {
 					rows.push([bu_displayName, bu_cloudType, bu_uuid, "No actions found for this cloud account", "", "", ""])
 				}
 				else {
+					// Found a BU action worth recording
 					bu_first_time = false
 					for (var j = 0; j < buActions.length; j +=1) {
 						buAction = buActions[j]
@@ -163,7 +182,8 @@ for (var i = 0; i < BUs.length; i +=1) {
 						target_uuid = buAction.target.uuid
 						target_name = buAction.target.displayName
 						reason = buAction.risk.description
-						rows.push([bu_displayName, bu_cloudType, bu_uuid, target_name, target_uuid, action_statement, reason])
+						var savings = getSavings(buAction)
+						rows.push([bu_displayName, bu_cloudType, bu_uuid, savigns, target_name, target_uuid, action_statement, reason])
 					}
 				}
 			} catch(err) {  // the likely error is the get BU Actions throws an error
