@@ -85,19 +85,28 @@ function generate_xls(file_name, headers, rows) {
 	wb.save(file_name)
 }
 
-// Get the savings information from an action object
-function get_savings(action) {
+// Get the savings/investment information from an action object
+function get_financials(action) {
 	
-	var savings = "N/A"
 	var stats = action.stats
 	stats.forEach(function(stat) {
 		if (stat.name == "costPrice") {
 			if (stat.filters[0].type == "savingsType") {
 				savings = stat.value
+				savings = parseFloat(savings)
 			}
 		}
 	})
-	return savings
+
+	var financials = {
+		amount: savings,
+		type: "Savings"
+	}
+	
+	if (savings < 0) {
+		financials.type = "Investment"
+	}
+	return financials
 }
 
 var output_type = "csv"
@@ -130,7 +139,7 @@ for (var a = 0; a < args.length; a+=1) {
 }
 	
 // CSV/table headers
-var headers = [ "Account Name", "Cloud Provider", "Cloud Account ID", "Savings ($/h)", "Target Name", "Target UUID", "Action to Take", "Reason for Action" ]
+var headers = [ "Account Name", "Cloud Provider", "Cloud Account ID", "Savings|Investment", "$/h", "Target Name", "Target UUID", "Action to Take", "Reason for Action" ]
 var rows = []
 
 // Get the cloud accounts connected to the turbo box
@@ -182,8 +191,8 @@ for (var i = 0; i < BUs.length; i +=1) {
 						target_uuid = buAction.target.uuid
 						target_name = buAction.target.displayName
 						reason = buAction.risk.description
-						var savings = getSavings(buAction)
-						rows.push([bu_displayName, bu_cloudType, bu_uuid, savigns, target_name, target_uuid, action_statement, reason])
+						var financials = get_financials(buAction)
+						rows.push([bu_displayName, bu_cloudType, bu_uuid, financials.type, financials.amount, target_name, target_uuid, action_statement, reason])
 					}
 				}
 			} catch(err) {  // the likely error is the get BU Actions throws an error
