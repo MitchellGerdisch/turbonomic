@@ -58,13 +58,40 @@ function generate_xls(file_name, headers, rows) {
 }
 
 // Get the savings/investment information from an action object
-function check_ri_ness(action) {
-	var returnval = false
-	if (action.reservedInstance) {
-		returnval = true
+function get_ri_info(action) {
+
+	var ri_info = {
+			"interesting": false,
+			"orig_coverage": 0,
+			"new_coverage": 0
+	}
+	if ("target" in action) {
+		var target = action.target
+		if ("aspects" in target) {
+			var aspects = target.aspects
+			if ("cloudAspect" in aspects) {
+				var cloudAspect = aspects.cloudAspect
+				if ("riCoveragePercentage" in cloudAspect) {
+					ri_info.orig_coverage = cloudAspect.riCoveragePercentage
+					if ("reservedInstance" in action) {
+						var reservedInstance = action.reservedInstance
+						if ("coupons" in reservedInstance) {
+							var coupons = reservedInstance.coupons
+							if (coupons.units == "RICoupon") {
+								var new_coverage = Math.round((coupons.value/coupons.capacity.avg) * 100)
+								if (new_coverage > 0) {
+									ri_info.new_coverage = new_coverage
+									ri_info.interesting = true
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 	
-	return returnval
+	return ri_info
 }
 
 // Get the savings/investment information from an action object
@@ -121,7 +148,8 @@ for (var a = 0; a < args.length; a+=1) {
 }
 	
 // CSV/table headers
-var headers = [ "Account Name", "Cloud Provider", "Cloud Account ID", "Savings|Investment", "$/h", "Target Name", "Target UUID", "Action to Take", "Reason for Action" ]
+//var headers = [ "Account Name", "Cloud Provider", "Cloud Account ID", "Savings|Investment", "$/h", "Target Name", "Target UUID", "Action to Take", "Reason for Action" ]
+var headers = [ "Target Name", "Target UUID", "Original RI Coverage", "New RI Coverage", "Action to Take", "Reason for Action" ]
 var rows = []
 
 // Get the cloud accounts connected to the turbo box
@@ -169,15 +197,16 @@ for (var i = 0; i < BUs.length; i +=1) {
 					for (var j = 0; j < buActions.length; j +=1) {
 						buAction = buActions[j]
 
-						var increase_ri_util = check_ri_ness(buAction)
-						if (increase_ri_util) {
-							// Found a BU action worth recording
+						var ri_info = get_ri_info(buAction)
+						if (ri_info.interesting) {
+							// Found a BU action with interesting RI coverage info worth returning
 							action_statement = buAction.details
 							target_uuid = buAction.target.uuid
 							target_name = buAction.target.displayName
 							reason = buAction.risk.description
+							
 							var financials = get_financials(buAction)
-							rows.push([bu_displayName, bu_cloudType, bu_uuid, financials.type, financials.amount, target_name, target_uuid, action_statement, reason])
+							rows.push([target_name, target_uuid, ri_info.orig_coverage, ri_info.new_coverage, action_statement, reason])
 						}
 					}
 				}
