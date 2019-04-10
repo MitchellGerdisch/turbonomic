@@ -12,12 +12,14 @@ param(
 $JSON_STUFF = Import-Csv $CSV_FILE |  ConvertTo-Json  | ConvertFrom-Json
 
 $SQL_SERVER_REGEXP = ""
+$NUMBER_FOUND_SERVERS = 0
 foreach ($ITEM in $JSON_STUFF) {
 	$NAME = $ITEM."Name"
 	$I_NAME = $ITEM."Instance Name"
 	$VERSION = $ITEM."Version"
 	if ($VERSION -match '[Ss][Qq][Ll] *2008') {
 		#Write-Output "GOOD: $NAME --  $I_NAME -- $VERSION"
+		$NUMBER_FOUND_SERVERS = $NUMBER_FOUND_SERVERS + 1
 		$NAME_REGEXP = ".*$I_NAME.*"
 		if ($SQL_SERVER_REGEXP) {
 			$SQL_SERVER_REGEXP = "$SQL_SERVER_REGEXP|$NAME_REGEXP" 
@@ -27,4 +29,7 @@ foreach ($ITEM in $JSON_STUFF) {
 	}
 }
 
+
+Write-Output "Found $NUMBER_FOUND_SERVERS Servers"
+Write-Output ""
 Write-Output $SQL_SERVER_REGEXP
