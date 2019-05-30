@@ -1,4 +1,4 @@
-# Documented in Green Circle article, DOC-XXXX
+# Documented in Green Circle article, DOC-6375
 # If this script is changed, be sure to update the article.
 
 fetch('/vmturbo/rest/markets/Market/actions').then(res => {
@@ -15,6 +15,7 @@ fetch('/vmturbo/rest/markets/Market/actions').then(res => {
 				console.log("Instance Name: "+ record.target.displayName); 
 				console.log("- RI Utilization: " + new_coverage + "%");
 				console.log("- Action: " + record.details);
+				console.log("- Reason: " + record.risk.subCategory);
 			}
 		} catch(err) {} 
 	});
