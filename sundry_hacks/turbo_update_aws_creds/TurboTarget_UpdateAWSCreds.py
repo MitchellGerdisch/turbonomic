@@ -2,12 +2,14 @@
 # Assumes Lambda has a route to the Turbonomic instance.
 # 
 # Uses Lambda environment variables for the following inputs:
-# turboinstance: DNS name or IP address for the turbo instance
-# accountid: The AWS account ID for which the keys are being updated in Turbonomic
-# accesskey: The new access key to use for the given AWS account target in Turbonomic
-# secretaccesskey: The new secret access key to use for the given AWS account target in Turbonomic
+# TURBOINSTANCE: DNS name or IP address for the turbo instance
+# TURBOUSER: Turbonomic username for API access.
+# TURBOPASSWORD: Turbonomic user password for API access.
+# ACCOUNTID: The AWS account ID for which the keys are being updated in Turbonomic
+# ACCESSKEY: The new access key to use for the given AWS account target in Turbonomic
+# SECRETACCESSKEY: The new secret access key to use for the given AWS account target in Turbonomic
 #
-# The lambda_handler can be modified to gather these parameters via other mechanisms and passed to the update_aws_target_cres() function.
+# The lambda_handler can be modified to gather these parameters via other mechanisms and passed to the update_aws_target_creds() function.
 
 
 import json
@@ -37,7 +39,7 @@ def update_aws_target_creds(turboinstance, turbouser, turbopassword, accountid, 
     headers=headers,
     auth=(turbouser, turbopassword),
     verify=False,
-    timeout=15,
+    timeout=60,
     params={'q': accountid, 'types':'BusinessAccount'}
     )
 
@@ -51,7 +53,7 @@ def update_aws_target_creds(turboinstance, turbouser, turbopassword, accountid, 
     headers=headers,
     auth=(turbouser, turbopassword),
     verify=False,
-    timeout=15,
+    timeout=60,
     json={
         'category':'Cloud Management',
         'type':'AWS',
@@ -69,22 +71,5 @@ def update_aws_target_creds(turboinstance, turbouser, turbopassword, accountid, 
      })
     
     return(update_response.json())
-    
-#     {
-#   "inputFields": [
-#     {
-#       "name": "username",
-#       "value": "myaccesskey"
-#     },
-#     {
-#       "name": "password",
-#       "value": "mysecuret"
-#     }
-#   ],
-#   "uuid": "_VrgWQKyKEemjrPHwhF4APg",
-#   "type": "AWS",
-#   "category": "Cloud Management"
-# }
-
 
 
