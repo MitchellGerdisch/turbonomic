@@ -67,9 +67,10 @@ fetch('/vmturbo/rest/search/?q=&scopes='+scope_id).then(res => {
 
 	if (ba_vms) {
 		
+		group_name = "BusApp_VMs_"+ba_name
 		vms_group_body = {
 			"isStatic": false,
-			"displayName": "BusApp_VMs_"+ba_name,
+			"displayName": group_name,
 			"memberUuidList": [
 			],
 			"criteriaList": [
@@ -89,13 +90,16 @@ fetch('/vmturbo/rest/search/?q=&scopes='+scope_id).then(res => {
 		        'Content-Type': 'application/json'
 		      }
 		})
+		
+		console.log("Created VM Group: "+group_name)
 	}
 
 	if (ba_dbs) {
 		
+		group_name = "BusApp_DBs_"+ba_name
 		dbs_group_body = {
 			"isStatic": false,
-			"displayName": "BusApp_DBs_"+ba_name,
+			"displayName": group_name,
 			"memberUuidList": [
 			],
 			"criteriaList": [
@@ -115,5 +119,8 @@ fetch('/vmturbo/rest/search/?q=&scopes='+scope_id).then(res => {
 		        'Content-Type': 'application/json'
 		      }
 		})
+		console.log("Created DB Server Group: "+group_name)
+
 	}
+	
 });
