@@ -1,5 +1,5 @@
 /*
-* Documented in Green Circle article, DOC-TBD
+* Documented in Green Circle article, DOC-6513
 * If this script is changed, be sure to update the article.
 * 
 * CAVEATS: 
