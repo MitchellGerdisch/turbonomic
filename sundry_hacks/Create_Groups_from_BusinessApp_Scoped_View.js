@@ -29,8 +29,8 @@ var scope_id = url_array[url_array.length-1];
  */
 
 var ba_name = "BA NAME NOT FOUND"
-var ba_vms = ""
-var ba_dbs = ""
+var static_filter_ba_vms = []
+var static_filter_ba_dbs = []
 
 fetch('/vmturbo/rest/search/?q=&scopes='+scope_id).then(res => {
 	return res.json();
@@ -41,50 +41,50 @@ fetch('/vmturbo/rest/search/?q=&scopes='+scope_id).then(res => {
 			ba_name = record.displayName
 		} 
 		else if (record.className == "VirtualMachine") {
-			if (ba_vms) {
-				ba_vms = ba_vms + "|" + record.displayName
-			}
-			else {
-				ba_vms = record.displayName
-			}
+			static_filter_ba_vms.push(record.uuid)
 		} else if (record.className == "DatabaseServer") {
-			if (ba_dbs) {
-				ba_dbs = ba_dbs + "|" + record.displayName
-			}
-			else {
-				ba_dbs = record.displayName
-			}
+			static_filter_ba_dbs.push(record.uuid)
 		}
 
 	});
 	console.log("Business Application Name: "+ba_name)
-	console.log("VMs in Bus App: "+ba_vms)
-	console.log("DB Servers in Bus App: "+ba_dbs)
+	console.log("VMs in Bus App: "+static_filter_ba_vms)
+	console.log("DB Servers in Bus App: "+static_filter_ba_dbs)
 	/* Build the vm and db groups for the application
 	 */
 	
 	group_url = '/api/v2/groups'
+	search_url = '/api/v2/search?q='
 
-	if (ba_vms) {
-		
+	if (static_filter_ba_vms.length > 0) {
 		group_name = "BusApp_VMs_"+ba_name
+		api_method = 'POST' /* assume we are creating a new group */
+		/* Check if group already exists */
+		search_url = '/api/v2/search?q='
+		response = fetch(search_url+group_name)
+			.then((resp) => resp.json())
+			.then(function(data) {
+				if (data.length > 0) {
+					console.log("data: "+data[0])
+					return({
+						api_method: 'PUT',
+						group_url: group_url+data[0].uuid
+					})
+				}
+			})
+		console.log("response: "+response)
+		
+		
+		
 		vms_group_body = {
-			"isStatic": false,
+			"isStatic": true,
 			"displayName": group_name,
-			"memberUuidList": [
-			],
-			"criteriaList": [
-			{
-				"expType": "RXEQ",
-	  			"expVal": ba_vms,
-	  			"filterType": "vmsByName",
-	  			"caseSensitive": true
-			}
-			],
+			"memberUuidList": static_filter_ba_vms,
+			"criteriaList": [],
 			"groupType": "VirtualMachine"
 		}
 		fetch(group_url, {
-			method: 'POST',
+			method: api_method,
 			body: JSON.stringify(vms_group_body),
 		    headers: {
 		        'Content-Type': 'application/json'
@@ -94,26 +94,18 @@ fetch('/vmturbo/rest/search/?q=&scopes='+scope_id).then(res => {
 		console.log("Created VM Group: "+group_name)
 	}
 
-	if (ba_dbs) {
-		
+	if (static_filter_ba_dbs.length > 0) {
 		group_name = "BusApp_DBs_"+ba_name
+		api_method = 'POST'
 		dbs_group_body = {
-			"isStatic": false,
+			"isStatic": true,
 			"displayName": group_name,
-			"memberUuidList": [
-			],
-			"criteriaList": [
-			{
-				"expType": "RXEQ",
-	  			"expVal": ba_dbs,
-	  			"filterType": "databaseServerByName",
-	  			"caseSensitive": true
-			}
-			],
+			"memberUuidList": static_filter_ba_dbs,
+			"criteriaList": [],
 			"groupType": "DatabaseServer"
 		}
 		fetch(group_url, {
-			method: 'POST',
+			method: api_method,
 			body: JSON.stringify(dbs_group_body),
 		    headers: {
 		        'Content-Type': 'application/json'
