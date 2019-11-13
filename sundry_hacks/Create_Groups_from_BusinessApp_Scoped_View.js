@@ -60,7 +60,11 @@ fetch('/vmturbo/rest/search/?q=&scopes='+scope_id).then(res => {
 		group_name = "BusApp_VMs_"+ba_name
 		api_method = 'POST' /* assume we are creating a new group */
 		/* Check if group already exists */
+			group_url = '/api/v2/groups'
+			group_name = "BusApp_VMs_Weblogic Lab"
+
 		search_url = '/api/v2/search?q='
+		response = new Response()
 		response = fetch(search_url+group_name)
 			.then((resp) => resp.json())
 			.then(function(data) {
