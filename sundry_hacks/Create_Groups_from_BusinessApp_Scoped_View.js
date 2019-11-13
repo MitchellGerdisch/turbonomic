@@ -15,6 +15,16 @@
 * BusApp_DBs_<BUSINESS APP NAME>: A group that contains the DB servers for that scoped view, assuming there are some.
 */
 
+function CreateUpdate_Group(group_url, api_method, body) {
+	fetch(group_url, {
+		method: api_method,
+		body: JSON.stringify(body),
+	    headers: {
+	        'Content-Type': 'application/json'
+	      }
+	})
+}
+
 
 var thisurl = document.URL;
 /* console.log("URL: "+thisurl); */
@@ -56,30 +66,9 @@ fetch('/vmturbo/rest/search/?q=&scopes='+scope_id).then(res => {
 	group_url = '/api/v2/groups'
 	search_url = '/api/v2/search?q='
 
+	/* Did we find any VMs in the Bus app? */
 	if (static_filter_ba_vms.length > 0) {
 		group_name = "BusApp_VMs_"+ba_name
-		api_method = 'POST' /* assume we are creating a new group */
-		/* Check if group already exists */
-			group_url = '/api/v2/groups'
-			group_name = "BusApp_VMs_Weblogic Lab"
-
-		search_url = '/api/v2/search?q='
-		response = new Response()
-		response = fetch(search_url+group_name)
-			.then((resp) => resp.json())
-			.then(function(data) {
-				if (data.length > 0) {
-					console.log("data: "+data[0])
-					return({
-						api_method: 'PUT',
-						group_url: group_url+data[0].uuid
-					})
-				}
-			})
-		console.log("response: "+response)
-		
-		
-		
 		vms_group_body = {
 			"isStatic": true,
 			"displayName": group_name,
@@ -87,20 +76,30 @@ fetch('/vmturbo/rest/search/?q=&scopes='+scope_id).then(res => {
 			"criteriaList": [],
 			"groupType": "VirtualMachine"
 		}
-		fetch(group_url, {
-			method: api_method,
-			body: JSON.stringify(vms_group_body),
-		    headers: {
-		        'Content-Type': 'application/json'
-		      }
-		})
+		
+		/* Does a group with the given name already exist? */
+		fetch(search_url+group_name)
+		.then(
+			function(response) {
+				if (response.status !== 200) {
+					console.log("*** There was a problem checking group existing: "+response.status);
+					return;
+				}
+				response.json().then(
+					function(data) {
+						if (data.length > 0) {
+							CreateUpdate_Group(group_url+"/"+data[0].uuid, 'PUT', vms_group_body) 
+						} else {
+							CreateUpdate_Group(group_url, 'POST', vms_group_body) 
+						}
+				});
+		});
 		
 		console.log("Created VM Group: "+group_name)
 	}
 
 	if (static_filter_ba_dbs.length > 0) {
 		group_name = "BusApp_DBs_"+ba_name
-		api_method = 'POST'
 		dbs_group_body = {
 			"isStatic": true,
 			"displayName": group_name,
@@ -108,13 +107,25 @@ fetch('/vmturbo/rest/search/?q=&scopes='+scope_id).then(res => {
 			"criteriaList": [],
 			"groupType": "DatabaseServer"
 		}
-		fetch(group_url, {
-			method: api_method,
-			body: JSON.stringify(dbs_group_body),
-		    headers: {
-		        'Content-Type': 'application/json'
-		      }
-		})
+		
+		/* Does a group with the given name already exist? */
+		fetch(search_url+group_name)
+		.then(
+			function(response) {
+				if (response.status !== 200) {
+					console.log("*** There was a problem checking group existing: "+response.status);
+					return;
+				}
+				response.json().then(
+					function(data) {
+						if (data.length > 0) {
+							CreateUpdate_Group(group_url+"/"+data[0].uuid, 'PUT', dbs_group_body) 
+						} else {
+							CreateUpdate_Group(group_url, 'POST', dbs_group_body) 
+						}
+				});
+		});
+		
 		console.log("Created DB Server Group: "+group_name)
 
 	}
