@@ -56,7 +56,7 @@ async function CreateBusAppGroups(param) {
 
 	} else {
 		busappname = param
-		busapp_uuid = await getBusAppUuid(busappname) 
+		busapp_uuid = await getUuid("BusApp", busappname) 
 		if (busapp_uuid) {
 			console.log("Building VM/DB group for Business Application, "+busappname) 
 			await BuildBusAppGroup(busapp_uuid)
@@ -106,7 +106,7 @@ async function BuildBusAppGroup(scope_id) {
 		}
 		
 		/* Either create a new group of Bus App VMs or update the existing group if it already exists. */
-		group_uuid = await getGroupUuid(group_name)
+		group_uuid = await getUuid("Group", group_name)
 		if (group_uuid) {
 			/* Found an existing group, so update it. */
 			await CreateUpdate_Group(group_url+"/"+group_uuid, 'PUT', vms_group_body) 
@@ -131,7 +131,7 @@ async function BuildBusAppGroup(scope_id) {
 		}
 		
 		/* Either create a new group of Bus App VMs or update the existing group if it already exists. */
-		group_uuid = await getGroupUuid(group_name)
+		group_uuid = await getUuid("Group", group_name)
 		if (group_uuid) {
 			/* Found an existing group, so update it. */
 			await CreateUpdate_Group(group_url+"/"+group_uuid, 'PUT', dbs_group_body) 
@@ -161,67 +161,50 @@ async function getBusAppInfo(scope_id) {
 	return await response.json()
 }
 
-/* Returns the UUID for the named business app */
-async function getBusAppUuid(busappname) {
-	search_body = {
-			"criteriaList": [
-				{
-					"expType": "RXEQ",
-					"expVal": "^"+busappname+"$",  /* need to limit to exact name match only so anchor the name */
-					"filterType": "busAppsByName",
-					"caseSensitive": true 
-				}
-				],
-				"logicalOperator": "AND",
-				"className": "BusinessApplication",
-				"scope": null
-	}
-	response = await fetch('/vmturbo/rest/search', {
-		method: 'POST',
-		body: JSON.stringify(search_body),
-	    headers: {
-	        'Content-Type': 'application/json'
-	      }
-	})
-	busappinfo =  await response.json()
-	if (busappinfo.length > 0) {
-		/* Found an existing group, so update it. */
-		return busappinfo[0].uuid
-	}
-}
-
-
-/* returns UUID for the named group */
-async function getGroupUuid(group_name) {
-	search_body = {
-			"criteriaList": [
-				{
-					"expType": "RXEQ",
-					"expVal": "^"+group_name+"$",  /* need to limit to exact name match only so anchor the name */
-					"filterType": "groupsByName",
-					"caseSensitive": true 
-				}
-				],
-				"logicalOperator": "AND",
-				"className": "Group",
-				"scope": null
-	}
-	response = await fetch('/vmturbo/rest/search', {
-		method: 'POST',
-		body: JSON.stringify(search_body),
-	    headers: {
-	        'Content-Type': 'application/json'
-	      }
-	})
-	groupinfo = await response.json()
-	if (groupinfo.length > 0) {
-		/* Found an existing group, so update it. */
-		return groupinfo[0].uuid
-	}
-}
-
+/* Returns search list of Business Applications */
 async function getBusAppsList() {
 	search_url = '/api/v2/search?types=BusinessApplication'
 	response = await fetch(search_url)
 	return await response.json()
 }
+
+/* Returns UUID for named entity of given type */
+async function getUuid(entity_type, entity_name) {
+	if (entity_type == "BusApp") {
+		filterType = "busAppsByName"
+		className = "BusinessApplication"
+	} else if (entity_type == "Group") {
+		filterType = "groupsByName"
+		className = "Group"
+	} else {
+		console.log("getUuid: Called with incorrect entity_type")
+		return 0
+	}
+
+	search_body = {
+			"criteriaList": [
+				{
+					"expType": "RXEQ",
+					"expVal": "^"+entity_name+"$",  /* need to limit to exact name match only so anchor the name */
+					"filterType": filterType,
+					"caseSensitive": true 
+				}
+				],
+				"logicalOperator": "AND",
+				"className": className,
+				"scope": null
+	}
+	response = await fetch('/vmturbo/rest/search', {
+		method: 'POST',
+		body: JSON.stringify(search_body),
+	    headers: {
+	        'Content-Type': 'application/json'
+	      }
+	})
+	info =  await response.json()
+	if (info.length > 0) {
+		/* Found an existing entity so return uuid */
+		return info[0].uuid
+	}
+}
+
