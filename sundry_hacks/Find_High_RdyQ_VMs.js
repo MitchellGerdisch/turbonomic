@@ -18,12 +18,10 @@ async function findHighRdyqVMs() {
 	onprem_vms = await getVMs()
 	
 	if (onprem_vms.length == 0) {
-		console.log("No on premise VMs found. Exiting.")
+		console.log("No on-premise VMs found. Exiting.")
 		return
 	}
-	
 	console.log("Found "+onprem_vms.length+" on premise VMs. Scanning their ready queue histories ...")
-
 	
 	/* Walk through the list of found VMs and do the following:
 	 * - Get the VM's UUID
@@ -52,6 +50,10 @@ async function findHighRdyqVMs() {
 		if ((onprem_vm.severity == "Critical")||(onprem_vm.severity == "Major") || (onprem_vm.severity == "Minor")) {
 			vm_name = onprem_vm.displayName
 			vm_uuid = onprem_vm.uuid
+			
+			/*
+			 *vm_cpunum = await getVmCpuNum(vm_uuid)
+			 */
 			vm_cpunum = onprem_vm.aspects.virtualMachineAspect.numVCPUs
 			vm_rdyq_type = "Q"+vm_cpunum+"VCPU"
 			
@@ -94,7 +96,7 @@ async function get_High_RdyQ(vm_uuid, vm_rdyq_type, start_time, end_time) {
 			"endDate":end_time
 	}
 
-	response = await fetch("/vmturbo/rest/stats/" + vm_uuid + "?disable_hateoas=true", {
+	response = await fetch("/api/v2/stats/" + vm_uuid + "?disable_hateoas=true", {
 		method: 'POST',
 		body: JSON.stringify(request_body),
 	    headers: {
@@ -118,25 +120,33 @@ async function get_High_RdyQ(vm_uuid, vm_rdyq_type, start_time, end_time) {
 }
 
 /* 
- * Returns list of on prem VMs with severity of Major or Critical 
- * This is done to allow the processing to focus on what should be useful examples.
+ * returns list of on prem vms with severity of major or critical 
+ * this is done to allow the processing to focus on what should be useful examples.
  */
 async function getVMs() {
-	request_body = {
-			"criteriaList": [],
-			"logicalOperator": "AND",
-			"className": "VirtualMachine",
-			"environmentType": "ONPREM",
-			"scope": null
-	}
-	response = await fetch('/vmturbo/rest/search/?ascending=false&disable_hateoas=true&order_by=severity&q=', {
-		method: 'POST',
-		body: JSON.stringify(request_body),
-		headers: {
-			'Content-Type': 'application/json'
-		}
-	})
-	return await response.json()	
+	 request_body = {
+			 "criteriaList": [],
+	 	 "logicalOperator": "AND",
+	 	 "className": "VirtualMachine",
+	 	 "environmentType": "ONPREM",
+	 	 "scope": null
+	 }
+	 response = await fetch('/api/v2/search/?ascending=false&disable_hateoas=true&order_by=severity&q=', {
+	 	 method: 'POST',
+	 	 body: JSON.stringify(request_body),
+	 	 headers: {
+	 		  'Content-Type': 'application/json'
+	 	 }
+	 })
+	 return await response.json() 
 }
 
-
+/*
+ * Gets the number of vCPUs for a given VM.
+ */
+async function getVmCpuNum(uuid) {
+	response = await fetch('/api/v2/entities/'+uuid+'/aspects/virtualMachineAspect')
+	vmaspect = await response.json()
+	vmcpunum = vmaspect.numVCPUs
+	console.log(vmcpunum)
+}
