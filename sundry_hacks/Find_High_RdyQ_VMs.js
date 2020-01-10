@@ -21,7 +21,7 @@ async function findHighRdyqVMs() {
 		console.log("No on-premise VMs found. Exiting.")
 		return
 	}
-	console.log("Found "+onprem_vms.length+" on premise VMs. Scanning their ready queue histories ...")
+	console.log("Found "+onprem_vms.length+" on-premise VMs. Scanning their ready queue histories ...")
 	
 	/* Walk through the list of found VMs and do the following:
 	 * - Get the VM's UUID
@@ -51,10 +51,8 @@ async function findHighRdyqVMs() {
 			vm_name = onprem_vm.displayName
 			vm_uuid = onprem_vm.uuid
 			
-			/*
-			 *vm_cpunum = await getVmCpuNum(vm_uuid)
-			 */
-			vm_cpunum = onprem_vm.aspects.virtualMachineAspect.numVCPUs
+			vm_cpunum = await getVmCpuNum(vm_uuid)
+			/*vm_cpunum = onprem_vm.aspects.virtualMachineAspect.numVCPUs*/
 			vm_rdyq_type = "Q"+vm_cpunum+"VCPU"
 			
 			/* 
@@ -147,6 +145,5 @@ async function getVMs() {
 async function getVmCpuNum(uuid) {
 	response = await fetch('/api/v2/entities/'+uuid+'/aspects/virtualMachineAspect')
 	vmaspect = await response.json()
-	vmcpunum = vmaspect.numVCPUs
-	console.log(vmcpunum)
+	return vmaspect.numVCPUs
 }
