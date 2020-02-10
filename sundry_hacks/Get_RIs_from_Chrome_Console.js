@@ -2,6 +2,9 @@
  * If this script is changed, be sure to update the article.
  */
 
+csvContent = "data:text/csv;charset=utf-8,";
+csvContent += "Instance Name,Current RI Utilization,New RI Utilization,Action,Reason\n" 
+
 no_action_found = true;
 fetch('/vmturbo/rest/markets/Market/actions').then(res => {
 	return res.json();
@@ -22,6 +25,7 @@ fetch('/vmturbo/rest/markets/Market/actions').then(res => {
 					console.log("- New RI Utilization: " + new_coverage + "%");
 					console.log("- Action: " + record.details);
 					console.log("- Reason: " + record.risk.subCategory);
+					csvContent += record.target.displayName + "," + current_ri_coverage_percentage + "," + new_coverage + "," + record.details + "," + record.risk.subCategory + "\n"
 				}
 			}
 		} catch(err) {} 
@@ -29,4 +33,9 @@ fetch('/vmturbo/rest/markets/Market/actions').then(res => {
 	if (no_action_found) {
 		console.log("*** NO RI UTILIZATION IMPROVING ACTIONS FOUND. ***")
 	}
+	
+	link = document.createElement('a')
+	link.setAttribute('href', encodeURI(csvContent));
+	link.setAttribute('download', `turbonomic_rdyq_${(new Date()).getTime()}.csv`);
+	link.click()
 });

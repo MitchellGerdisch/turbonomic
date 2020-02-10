@@ -79,11 +79,22 @@ async function findHighRdyqVMs() {
 	
 	sorted_rdyq_info = _.sortBy(vm_rdyq_info, 'norm_rdyq')
 	
+	csvContent = "data:text/csv;charset=utf-8,";
+	csvContent += "VM Name,RdyQ,High RdyQ, Normalized RdyQ\n"
+
 	console.log("Here are VMs with interesting ready queue histories:")
 	for (k = 0; k < sorted_rdyq_info.length; k++) {
 		rdyq_item = sorted_rdyq_info[k]
+		
 		console.log("VM Name: "+rdyq_item.name+"; RdyQ: "+rdyq_item.rdyq+"; High RdyQ: "+rdyq_item.high_rdyq+"; Normalized RdyQ: "+rdyq_item.norm_rdyq)
+	
+		csvContent += rdyq_item.name + "," + rdyq_item.rdyq + "," + rdyq_item.high_rdyq + "," + rdyq_item.norm_rdyq + "\n"
 	}
+	
+	link = document.createElement('a')
+	link.setAttribute('href', encodeURI(csvContent));
+	link.setAttribute('download', `turbonomic_rdyq_${(new Date()).getTime()}.csv`);
+	link.click();
 	
 }
 
