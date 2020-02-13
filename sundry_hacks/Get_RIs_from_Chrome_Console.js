@@ -1,5 +1,5 @@
-/* Documented in Green Circle article, DOC-6375
- * If this script is changed, be sure to update the article.
+/* 
+ * Finds actions that improve RI utilization.
  */
 
 csvContent = "data:text/csv;charset=utf-8,";
