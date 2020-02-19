@@ -1,9 +1,6 @@
 /*
-* Documented in Green Circle article, DOC-6513
-* If this script is changed, be sure to update the article.
-* 
 * CAVEATS: 
-* 	This is a pretty much csunny day script. It doesn't do any error checking.
+* 	This is a pretty much sunny day script. It doesn't do any error checking.
 * 	This script ONLY works for Business Applications.
 * 
 * How to Use:
