@@ -12,7 +12,9 @@
  *  CreateSnowOrchPolicy("My Great Orch Policy", "SNOW_VMs-"
  *  This will create a policy with name "My Great Orch Policy" scoped to all groups with the string "SNOW_VMs-" in their name.
  * 
- * CAVEAT: This is a sunny day script with no error handling.
+ * CAVEATS: 
+ * 	This is a sunny day script with no error handling.
+ * 	The policy it creates is only for RESIZE Action Orchestration.
  */
 
 
