@@ -2,6 +2,16 @@
  * The default approach for the SNOW orchestration policy is to create both the CR and an audit record.
  * This can overwhelm SNOW sometimes, so this script creates the orch policy so that only the CR is created.
  * 
+ * USAGE:
+ * 	CreateSnowOrchPolicy(policy_name, group_match_string)
+ *  where
+ *  	policy_name is a quoted string with the name of the policy to be created
+ *  	group_match_string is a quoted string that will be used to match on group names. This is NOT a regexp.
+ *  
+ *  E.g.
+ *  CreateSnowOrchPolicy("My Great Orch Policy", "SNOW_VMs-"
+ *  This will create a policy with name "My Great Orch Policy" scoped to all groups with the string "SNOW_VMs-" in their name.
+ * 
  * CAVEAT: This is a sunny day script with no error handling.
  */
 
