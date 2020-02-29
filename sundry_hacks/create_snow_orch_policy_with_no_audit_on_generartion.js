@@ -13,7 +13,7 @@
  *  This will create a policy with name "My Great Orch Policy" scoped to all groups with the string "SNOW_VMs-" in their name.
  * 
  * CAVEATS: 
- * 	This is a sunny day script with no error handling.
+ * 	The only error this script handles is if the policy creation fails.
  * 	The policy it creates is only for RESIZE Action Orchestration.
  */
 
@@ -71,10 +71,6 @@ async function CreateSnowOrchPolicy(policy_name, group_search_string) {
 		        {
 		          "uuid": "approvalBackendResizeVM",
 		          "value": "ServiceNow"
-		        },
-		        {
-		          "uuid": "auditAfterExecResizeVM",
-		          "value": "ServiceNow"
 		        }
 		      ]
 		    }
@@ -94,7 +90,16 @@ async function CreateSnowOrchPolicy(policy_name, group_search_string) {
 			'Content-Type': 'application/json'
 		}
 	})
-	console.log("If no error is seen above, then policy, "+policy_name+", was created.")
+	
+	jsonResponse = await response.json()
+	if (jsonResponse.hasOwnProperty("type")) {
+		/* If the response has a "type" field, that field contains the http error code (e.g. 400, 504) and there will be an 
+		 * exception field with whatever message the server returned. 
+		 * Of course, if the correct response has a type field in it, then more logic is needed to look at the type field and act accordingly. */
+		console.log("ERROR: "+jsonResponse.exception)
+	} else {
+		console.log("Policy, "+policy_name+", was created.")
+	}
 }
 
 async function getGroups(group_search_string) {
