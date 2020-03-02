@@ -33,12 +33,9 @@ async function CreateScopedCloudDashboard(group_name, dashboard_name) {
 	console.log("Building dashboard, "+dashboard_name+", scoped to group, "+group_name+" ...")
 	
 	group_uuid = await getUuid("Group", group_name)
-	console.log("GROUP UUID: "+group_uuid)
 
 	/* Create the dashboard */
 	dashboard_body = buildDashBody(group_uuid, dashboard_name)
-	
-	console.log(JSON.stringify(dashboard_body))
 	
 	response = await fetch('/api/v2/widgetsets', {
 		method: 'POST',
