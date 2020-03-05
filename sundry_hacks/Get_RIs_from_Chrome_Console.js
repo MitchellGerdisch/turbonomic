@@ -36,6 +36,6 @@ fetch('/vmturbo/rest/markets/Market/actions').then(res => {
 	
 	link = document.createElement('a')
 	link.setAttribute('href', encodeURI(csvContent));
-	link.setAttribute('download', `turbonomic_rdyq_${(new Date()).getTime()}.csv`);
+	link.setAttribute('download', `turbonomic_RIactions_${(new Date()).getTime()}.csv`);
 	link.click()
 });
