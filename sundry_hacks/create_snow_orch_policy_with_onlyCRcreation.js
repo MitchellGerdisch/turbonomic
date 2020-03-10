@@ -30,22 +30,29 @@ async function CreateSnowOrchPolicy(policy_name, group_search_string) {
 		return
 	}
 	
-	/* Find groups and related IDs based on the search string passed in. */
-	console.log("Finding groups with names that match, "+group_search_string)
-	orch_groups = await getGroups(group_search_string)
-	if (orch_groups.length == 0) {
-		console.log("No groups found. Exiting.")
-		return
+	/* Did user pass a comma separated list of specific group names? */
+	if (/(,)/.test(group_search_string)) {
+		group_names = group_search_string.split(',')
+	} else {
+		/* Or, a search string was provided so find groups and related IDs based on the search string passed in. */
+		console.log("Finding groups with names that match, "+group_search_string)
+		orch_groups = await getGroups(group_search_string)
+		if (orch_groups.length == 0) {
+			console.log("No groups found. Exiting.")
+			return
+		}
+		console.log("Found "+orch_groups.length+" groups that matched the string given.")
+		group_names = orch_groups.map(orch_group => orch_group.displayName)
 	}
-	console.log("Found "+orch_groups.length+" groups that matched the string given. Here's the list:")
-	group_names = orch_groups.map(orch_group => orch_group.displayName)
+
+	console.log("Policy is being scoped to these groups:")
 	console.log(JSON.stringify(group_names))
 	
 	/* Now create the policy */
 	/* first build the scopes section of the policy creation body */
 	console.log("\nCreating policy, "+policy_name+" ...")
 	scopes = []
-	for (i = 0; i < orch_groups.length; i++) {
+	for (i = 0; i < group_names.length; i++) {
 		group_uuid = await getUuid("Group",group_names[i])
 		scopes.push({
 			"uuid":group_uuid
