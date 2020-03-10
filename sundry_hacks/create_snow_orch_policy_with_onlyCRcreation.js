@@ -7,6 +7,7 @@
  *  where
  *  	policy_name is a quoted string with the name of the policy to be created
  *  	group_match_string is a quoted string that will be used to match on group names. This is NOT a regexp.
+ *  	***NOTE*** If the group_match_string is a quoted, comma-separated list of group names, then the policy will be scoped to those specific groups.
  *  
  *  E.g.
  *  CreateSnowOrchPolicy("My Great Orch Policy", "SNOW_VMs-"
