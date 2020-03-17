@@ -1,3 +1,4 @@
+#### DEPRECATED #### See make-memmetrics-groups script #####
 # Looks for  servers in a CSV file with mem metrics ("memorySize") and produces a big OR-ed regular expression that can be used to define a Virtual Machine dynamic group in Turbonomic
 
 # INPUTS: 
