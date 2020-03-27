@@ -40,10 +40,10 @@ async function CreateScopedCloudDashboard(group_name, dashboard_name) {
 	
 	console.log("Building dashboard, "+dashboard_name+", scoped to group, "+group_name+" ...")
 	
-	group_uuid = await getUuid("Group", group_name)
+	group_info = await getUuid("Group", group_name)
 	
 	/* Create the dashboard */
-	dashboard_body = buildDashBody(group_uuid, dashboard_name)
+	dashboard_body = buildDashBody(group_info, dashboard_name)
 	
 	response = await fetch('/vmturbo/rest/widgetsets', {
 		method: 'POST',
@@ -70,8 +70,10 @@ async function CreateScopedCloudDashboard(group_name, dashboard_name) {
 /*
  * Builds the dashboard API body with the widgets we want for the given scope.
  */
-function buildDashBody(group_uuid, dashboard_name) {
+function buildDashBody(group_info, dashboard_name) {
 
+	group_uuid = group_info["uuid"]
+	group_name = group_info["name"]
 	/* Build the API body */
 	dashboard_body = {
 	    "displayName": dashboard_name, 
@@ -82,6 +84,7 @@ function buildDashBody(group_uuid, dashboard_name) {
 	      "type": "costSavedByActions",
 	      "scope": {
 	        "uuid": group_uuid,
+	        "displayName": group_name,
 	        "className": "RefGroup",
 	      },
 	      "row": 11,
@@ -111,6 +114,7 @@ function buildDashBody(group_uuid, dashboard_name) {
 	        "type": "pendingActions",
 	        "scope": {
 	          "uuid": group_uuid,
+	          "displayName": group_name,
 	          "className": "RefGroup",
 	        },
 	        "row": 0,
@@ -138,6 +142,7 @@ function buildDashBody(group_uuid, dashboard_name) {
 	        "type": "potentialSavingOrInvestment",
 	        "scope": {
 	          "uuid": group_uuid,
+	          "displayName": group_name,
 	          "className": "RefGroup",
 	        },
 	        "row": 11,
@@ -165,6 +170,7 @@ function buildDashBody(group_uuid, dashboard_name) {
 	        "type": "potentialSavingOrInvestment",
 	        "scope": {
 	          "uuid": group_uuid,
+	          "displayName": group_name,
 	          "className": "RefGroup",
 	        },
 	        "row": 11,
@@ -192,6 +198,7 @@ function buildDashBody(group_uuid, dashboard_name) {
 	        "type": "resourceComparison",
 	        "scope": {
 	          "uuid": group_uuid,
+	          "displayName": group_name,
 	          "className": "RefGroup",
 	        },
 	        "row": 0,
@@ -260,7 +267,10 @@ async function getUuid(entity_type, entity_name) {
 	
 	if (info.length > 0) {
 		/* Found an existing entity so return uuid */
-		return info[0].uuid
+		return {
+			"uuid":info[0].uuid,
+			"name":info[0].displayName
+		}
 	}
 }
 

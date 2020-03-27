@@ -24,10 +24,22 @@
 
 /* Main function called to build groups 
  * Usage:
- * - CreateBusAppGroups("scoped"|: Produces VM/DB group(s) for Business Application currently scoped in the Turbo UI view.
+ * - CreateBusAppGroups("scoped"): Produces VM/DB group(s) for Business Application currently scoped in the Turbo UI view.
  * - CreateBusAppGroups("all"): Produces VM/DB groups for ALL Business Applications known by the Turbo instance.
  * - CreateBusAppGroups("<NAME_OF_BUSINESS_APP>"): Produces VM/DB group(s) for named Business Application
  */
+
+/*
+ * Print usage
+ */
+ console.log("")
+ console.log("**** USAGE ****")
+ console.log("  CreateBusAppGroups(\"scoped\"): Produces VM/DB group(s) for Business Application currently scoped in the Turbo UI view.")
+ console.log("  CreateBusAppGroups(\"all\"): Produces VM/DB groups for ALL Business Applications known by the Turbo instance.")
+ console.log("  CreateBusAppGroups(\"<NAME_OF_BUSINESS_APP>\"): Produces VM/DB group(s) for named Business Application.")
+ console.log("")
+
+
 async function CreateBusAppGroups(param) {
 	if ((param == null) || (param == "") || (param == "scoped")) {
 		var thisurl = document.URL;
@@ -88,7 +100,8 @@ async function BuildBusAppGroup(scope_id) {
 	console.log("VMs in Bus App: " + ((ba_vms.length > 0) ? ba_vms : "NONE FOUND"))
 	console.log("DB Servers in Bus App: " + ((ba_dbs.length > 0) ? ba_dbs : "NONE FOUND"))
 	
-	group_url = '/api/v2/groups'
+	group_url = '/vmturbo/rest/groups'
+	/*group_url = '/api/v2/groups'*/
 	/*search_url = '/api/v2/search?q='*/
 
 	/* Did we find any VMs in the Bus app? */
@@ -160,7 +173,8 @@ async function getBusAppInfo(scope_id) {
 
 /* Returns search list of Business Applications */
 async function getBusAppsList() {
-	search_url = '/api/v2/search?types=BusinessApplication'
+	/*search_url = '/api/v2/search?types=BusinessApplication'*/
+	search_url = '/vmturbo/rest/search?types=BusinessApplication'
 	response = await fetch(search_url)
 	return await response.json()
 }
