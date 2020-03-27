@@ -8,6 +8,14 @@
  *   - Wait for the processing to complete and a list of VM names and related data to be presented.
  *     The most interesting examples should be at the bottom of the list.
  */
+
+
+/*
+ * No parameters currently supported, so autorun the script.
+ */
+findHighRdyqVMs()
+
+
 async function findHighRdyqVMs() { 
 	
 	console.log("Search for high ready queue VMs has started ...")
@@ -105,7 +113,7 @@ async function get_High_RdyQ(vm_uuid, vm_rdyq_type, start_time, end_time) {
 			"endDate":end_time
 	}
 
-	response = await fetch("/api/v2/stats/" + vm_uuid + "?disable_hateoas=true", {
+	response = await fetch("/vmturbo/rest/stats/" + vm_uuid + "?disable_hateoas=true", {
 		method: 'POST',
 		body: JSON.stringify(request_body),
 	    headers: {
@@ -140,7 +148,7 @@ async function getVMs() {
 	 	 "environmentType": "ONPREM",
 	 	 "scope": null
 	 }
-	 response = await fetch('/api/v2/search/?ascending=false&disable_hateoas=true&order_by=severity&q=', {
+	 response = await fetch('/v2/search/?ascending=false&disable_hateoas=true&order_by=severity&q=', {
 	 	 method: 'POST',
 	 	 body: JSON.stringify(request_body),
 	 	 headers: {

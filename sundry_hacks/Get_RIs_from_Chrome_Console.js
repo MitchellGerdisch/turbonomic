@@ -2,6 +2,10 @@
  * Finds actions that improve RI utilization.
  */
 
+console.log("")
+console.log("**** Finding RI-improving actions ....")
+console.log("")
+
 csvContent = "data:text/csv;charset=utf-8,";
 csvContent += "Instance Name,Current RI Utilization,New RI Utilization,Action,Reason\n" 
 
@@ -32,10 +36,11 @@ fetch('/vmturbo/rest/markets/Market/actions').then(res => {
 	});
 	if (no_action_found) {
 		console.log("*** NO RI UTILIZATION IMPROVING ACTIONS FOUND. ***")
+	} else {
+		console.log("*** Downloading CSV containing RI-improving actions.")
+		link = document.createElement('a')
+		link.setAttribute('href', encodeURI(csvContent));
+		link.setAttribute('download', `turbonomic_RIactions_${(new Date()).getTime()}.csv`);
+		link.click()
 	}
-	
-	link = document.createElement('a')
-	link.setAttribute('href', encodeURI(csvContent));
-	link.setAttribute('download', `turbonomic_RIactions_${(new Date()).getTime()}.csv`);
-	link.click()
 });

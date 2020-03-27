@@ -18,26 +18,34 @@
  */
 
 
+/*
+ * Print usage info when the snippet is run/loaded.
+ */
+console.log("")
+console.log("**** USAGE: CreateScopedCloudDashboard(\"GROUP NAME\",\"DASHBOARD NAME\")")
+console.log("")
+
+
 async function CreateScopedCloudDashboard(group_name, dashboard_name) {
 	if ((group_name == null) || (group_name == "")) {
 		console.log("**** Need to pass name for group to be used for the scope of the dashboard.")
-		console.log("**** USAGE: CreateScopedCloudDashboard(\"GROUP NAME\",\"DASHBOARD NAME\"")
+		console.log("**** USAGE: CreateScopedCloudDashboard(\"GROUP NAME\",\"DASHBOARD NAME\")")
 		return
 	}
 	if ((dashboard_name == null) || (dashboard_name == "")) {
 		console.log("**** Need to pass name for dashboard to be created.")
-		console.log("**** USAGE: CreateScopedCloudDashboard(\"GROUP NAME\",\"DASHBOARD NAME\"")
+		console.log("**** USAGE: CreateScopedCloudDashboard(\"GROUP NAME\",\"DASHBOARD NAME\")")
 		return
 	}
 	
 	console.log("Building dashboard, "+dashboard_name+", scoped to group, "+group_name+" ...")
 	
 	group_uuid = await getUuid("Group", group_name)
-
+	
 	/* Create the dashboard */
 	dashboard_body = buildDashBody(group_uuid, dashboard_name)
 	
-	response = await fetch('/api/v2/widgetsets', {
+	response = await fetch('/vmturbo/rest/widgetsets', {
 		method: 'POST',
 		body: JSON.stringify(dashboard_body),
 		headers: {
@@ -46,6 +54,8 @@ async function CreateScopedCloudDashboard(group_name, dashboard_name) {
 	})
 	
 	jsonResponse = await response.json()
+	
+	
 	if (jsonResponse.hasOwnProperty("type")) {
 		/* If the response has a "type" field at the top level of the json structure, that field contains the http error code (e.g. 400, 504) and there will be an 
 		 * exception field with whatever message the server returned. 
@@ -61,7 +71,7 @@ async function CreateScopedCloudDashboard(group_name, dashboard_name) {
  * Builds the dashboard API body with the widgets we want for the given scope.
  */
 function buildDashBody(group_uuid, dashboard_name) {
-	
+
 	/* Build the API body */
 	dashboard_body = {
 	    "displayName": dashboard_name, 
@@ -247,8 +257,10 @@ async function getUuid(entity_type, entity_name) {
 	      }
 	})
 	info =  await response.json()
+	
 	if (info.length > 0) {
 		/* Found an existing entity so return uuid */
 		return info[0].uuid
 	}
 }
+
