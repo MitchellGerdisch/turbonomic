@@ -4,17 +4,22 @@
  * The widgets are formatted and placed on the dashboard in a nice way.
  * 
  * USAGE:
- * 	CreateScopedCloudDashboard(group_name, dashboard_name)
+ * 	CreateScopedCloudDashboard(scope_type, scope_name, dashboard_name)
  *  where
- *  	group_name is the exact, unique, group name for the cloud resources you want the dashboard to be scoped to.
+ *  	scope_type is "Group" or "Account" or "BillingFamily"
+ *  	scope_name is the exact, unique, name for the cloud resources group or account or billing family you want the dashboard to be scoped to.
  *  	dashboard_name is the name you want to give the dashboard
  *  
  *  E.g.
- * 	CreateScopedCloudDashboard("Preprod AWS Accounts Group", "Preprod AWS Account Dashboard")
+ * 	CreateScopedCloudDashboard("Group", "Preprod AWS Accounts Group", "Preprod AWS Account Dashboard")
  *  This will create a dashboard named "Preprod AWS Account Dashboard" that is scoped to the elements in the group named "Preprod AWS Accounts Group"
+ *  
+ *  CreateScopedCloudDashboard("Account", "AWS Dev", "AWS Dev Dashboard")
+ *  This will create a dashboard named "AWS Dev Dashboard" that is scoped to the account, "AWS Dev."
  * 
- * CAVEATS: 
- * 	Only works with groups of Business Accounts
+ *  CreateScopedCloudDashboard("BillingFamily", "EA Azure", "EA Azure Dashboard")
+ *  This will create a dashboard named "EA Azure Dashboard" that is scoped to the billing family, "EA Azure"
+ * 
  */
 
 
@@ -22,28 +27,35 @@
  * Print usage info when the snippet is run/loaded.
  */
 console.log("")
-console.log("**** USAGE: CreateScopedCloudDashboard(\"GROUP NAME\",\"DASHBOARD NAME\")")
+console.log("**** USAGE: CreateScopedCloudDashboard(\"Group\", \"GROUP NAME\" ,\"DASHBOARD NAME\")")
+console.log("**** USAGE: CreateScopedCloudDashboard(\"Account\", \"ACCOUNT NAME\" ,\"DASHBOARD NAME\")")
+console.log("**** USAGE: CreateScopedCloudDashboard(\"BillingFamily\", \"BILLING FAMILY NAME\" ,\"DASHBOARD NAME\")")
 console.log("")
 
 
-async function CreateScopedCloudDashboard(group_name, dashboard_name) {
-	if ((group_name == null) || (group_name == "")) {
+async function CreateScopedCloudDashboard(scope_type, scope_name, dashboard_name) {
+	if ((scope_type == null) || (scope_type == "")) {
+		console.log("**** Need to pass scope type - i.e. \"Group\" or \"Account\" or \"BillingFamily\"")
+		console.log("**** USAGE: CreateScopedCloudDashboard(\"Group\"|\"Account\"|\"BillingFamily\", \"GROUP OR ACCOUNT or BILLING FAMILY NAME\" ,\"DASHBOARD NAME\")")
+		return
+	}
+	if ((scope_name == null) || (scope_name == "")) {
 		console.log("**** Need to pass name for group to be used for the scope of the dashboard.")
-		console.log("**** USAGE: CreateScopedCloudDashboard(\"GROUP NAME\",\"DASHBOARD NAME\")")
+		console.log("**** USAGE: CreateScopedCloudDashboard(\"Group\"|\"Account\"|\"BillingFamily\", \"GROUP OR ACCOUNT or BILLING FAMILY NAME\" ,\"DASHBOARD NAME\")")
 		return
 	}
 	if ((dashboard_name == null) || (dashboard_name == "")) {
 		console.log("**** Need to pass name for dashboard to be created.")
-		console.log("**** USAGE: CreateScopedCloudDashboard(\"GROUP NAME\",\"DASHBOARD NAME\")")
+		console.log("**** USAGE: CreateScopedCloudDashboard(\"Group\"|\"Account\"|\"BillingFamily\", \"GROUP OR ACCOUNT or BILLING FAMILY NAME\" ,\"DASHBOARD NAME\")")
 		return
 	}
 	
-	console.log("Building dashboard, "+dashboard_name+", scoped to group, "+group_name+" ...")
+	console.log("Building dashboard, "+dashboard_name+", scoped to "+scope_type+", "+scope_name+" ...")
 	
-	group_info = await getUuid("Group", group_name)
+	scope_info = await getUuid(scope_type, scope_name)
 	
 	/* Create the dashboard */
-	dashboard_body = buildDashBody(group_info, dashboard_name)
+	dashboard_body = buildDashBody(scope_info, dashboard_name)
 	
 	response = await fetch('/vmturbo/rest/widgetsets', {
 		method: 'POST',
@@ -70,10 +82,10 @@ async function CreateScopedCloudDashboard(group_name, dashboard_name) {
 /*
  * Builds the dashboard API body with the widgets we want for the given scope.
  */
-function buildDashBody(group_info, dashboard_name) {
+function buildDashBody(scope_info, dashboard_name) {
 
-	group_uuid = group_info["uuid"]
-	group_name = group_info["name"]
+	scope_uuid = scope_info["uuid"]
+	scope_name = scope_info["name"]
 	/* Build the API body */
 	dashboard_body = {
 	    "displayName": dashboard_name, 
@@ -83,8 +95,8 @@ function buildDashBody(group_info, dashboard_name) {
 	      "displayName": "COST_SAVED_BY_ACTIONS_WIDGET_TITLE",
 	      "type": "costSavedByActions",
 	      "scope": {
-	        "uuid": group_uuid,
-	        "displayName": group_name,
+	        "uuid": scope_uuid,
+	        "displayName": scope_name,
 	        "className": "RefGroup",
 	      },
 	      "row": 11,
@@ -113,8 +125,8 @@ function buildDashBody(group_info, dashboard_name) {
 	        "displayName": "PENDING_ACTIONS",
 	        "type": "pendingActions",
 	        "scope": {
-	          "uuid": group_uuid,
-	          "displayName": group_name,
+	          "uuid": scope_uuid,
+	          "displayName": scope_name,
 	          "className": "RefGroup",
 	        },
 	        "row": 0,
@@ -141,8 +153,8 @@ function buildDashBody(group_info, dashboard_name) {
 	        "displayName": "WIDGET.POTENTIAL_SAVING_OR_INVESTMENT.NAME",
 	        "type": "potentialSavingOrInvestment",
 	        "scope": {
-	          "uuid": group_uuid,
-	          "displayName": group_name,
+	          "uuid": scope_uuid,
+	          "displayName": scope_name,
 	          "className": "RefGroup",
 	        },
 	        "row": 11,
@@ -169,8 +181,8 @@ function buildDashBody(group_info, dashboard_name) {
 	        "displayName": "WIDGET.POTENTIAL_SAVING_OR_INVESTMENT.NAME",
 	        "type": "potentialSavingOrInvestment",
 	        "scope": {
-	          "uuid": group_uuid,
-	          "displayName": group_name,
+	          "uuid": scope_uuid,
+	          "displayName": scope_name,
 	          "className": "RefGroup",
 	        },
 	        "row": 11,
@@ -197,8 +209,8 @@ function buildDashBody(group_info, dashboard_name) {
 	        "displayName": "RESOURCE_COMPARISON_SUMMARY_BY_COST",
 	        "type": "resourceComparison",
 	        "scope": {
-	          "uuid": group_uuid,
-	          "displayName": group_name,
+	          "uuid": scope_uuid,
+	          "displayName": scope_name,
 	          "className": "RefGroup",
 	        },
 	        "row": 0,
@@ -238,6 +250,12 @@ async function getUuid(entity_type, entity_name) {
 	} else if (entity_type == "Group") {
 		filterType = "groupsByName"
 		className = "Group"
+	} else if (entity_type == "Account") {
+		filterType = "businessAccountByName"
+		className = "BusinessAccount"
+	} else if (entity_type == "BillingFamily") {
+		filterType = "billingFamilyByName"
+		className = "BillingFamily"
 	} else {
 		console.log("getUuid: Called with incorrect entity_type")
 		return 0
