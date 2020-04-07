@@ -125,9 +125,13 @@ for (var a = 0; a < args.length; a+=1) {
 		case "-x":
 			output_type = "xlsx"
 		    file_directory = args[a+1]
-			if (file_directory === undefined)
+			// If next item is another paramter or nothing then use default directory
+			if ((file_directory === undefined) || (file_directory.match(/-.*/))) {
 				file_directory = "."
-			a+=1
+			} else {
+				// Assume it's a proper path to a directory and progress the arguments counter
+				a+=1
+			}
 			break
 		case "-m":
 			per_account_output = true
@@ -209,7 +213,7 @@ for (var i = 0; i < BUs.length; i +=1) {
 		if (per_account_output == true) {
 			var d = new Date()
 			var datestamp = Math.round(d.getTime() / 1000)
-			file_name = file_directory + "/" + file_name_root + "_" + bu_uuid + "_" + datestamp + ".xlsx"
+			file_name = file_directory + "/" + file_name_root + "_" + bu_displayName.split(" ").join("") + "_" + datestamp + ".xlsx"
 			output_data(output_type, file_name, headers, rows)
 			rows = [] // reset the rows for the next account
 		}
