@@ -7,7 +7,7 @@ console.log("**** Finding RI-improving actions ....")
 console.log("")
 
 csvContent = "data:text/csv;charset=utf-8,";
-csvContent += "Instance Name,Current RI Utilization,New RI Utilization,Action,Reason\n" 
+csvContent += "Instance Name,Account Name,Current RI Utilization,New RI Utilization,Action,Reason\n" 
 
 no_action_found = true;
 fetch('/vmturbo/rest/markets/Market/actions').then(res => {
@@ -25,11 +25,12 @@ fetch('/vmturbo/rest/markets/Market/actions').then(res => {
 				if (new_coverage > 0) {
 					no_action_found = false;
 					console.log("Instance Name: "+ record.target.displayName); 
+					console.log("- Account Name: "+ record.target.discoveredBy.displayName);
 					console.log("- Current RI Utilization: "+ current_ri_coverage_percentage + "%");
 					console.log("- New RI Utilization: " + new_coverage + "%");
 					console.log("- Action: " + record.details);
 					console.log("- Reason: " + record.risk.subCategory);
-					csvContent += record.target.displayName + "," + current_ri_coverage_percentage + "," + new_coverage + "," + record.details + "," + record.risk.subCategory + "\n"
+					csvContent += record.target.displayName + "," + record.target.discoveredBy.displayName + "," + current_ri_coverage_percentage + "," + new_coverage + "," + record.details + "," + record.risk.subCategory + "\n"
 				}
 			}
 		} catch(err) {} 
