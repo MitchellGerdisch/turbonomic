@@ -17,20 +17,20 @@
 		"actionPhase": "REPLACE"
  	},
 	{
-                "name": "post_resize_vm",
-                "description": "script simply outputs date in file local to script",
-                "scriptPath": "./post_resize_vm.sh",
-                "entityType": "VIRTUAL_MACHINE",
-                "actionType": "RIGHT_SIZE",
-                "actionPhase": "POST"
-        },
-        {
-                "name": "post_move_vm",
-                "description": "script simply outputs date in file local to script",
-                "scriptPath": "./post_move_vm.sh",
-                "entityType": "VIRTUAL_MACHINE",
-                "actionType": "MOVE",
-                "actionPhase": "POST"
-        }
+		"name": "post_resize_vm",
+		"description": "script simply outputs date in file local to script",
+		"scriptPath": "./post_resize_vm.sh",
+		"entityType": "VIRTUAL_MACHINE",
+		"actionType": "RIGHT_SIZE",
+		"actionPhase": "POST"
+	},
+	{
+		"name": "post_move_vm",
+		"description": "script simply outputs date in file local to script",
+		"scriptPath": "./post_move_vm.sh",
+		"entityType": "VIRTUAL_MACHINE",
+		"actionType": "MOVE",
+		"actionPhase": "POST"
+	}
  ]
 } 
