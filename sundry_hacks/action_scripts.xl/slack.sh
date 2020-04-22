@@ -10,11 +10,11 @@
 # - message: This is a quoted string of text to send to the slack channel.
 #
 # REQUIRED ENVIRONMENT VARIABLES
-# - SLACK_WEBHOOK: this environment variable contains secret webhook code for the channel. It is obtained when you create the webhook.
+# - SLACK_WEBHOOK: this environment variable contains the entire webhook URL (e.g. https://hooks.slack.com/services/XXXXX/YYYYYYYYYYYYYY)
 # 
 
 
 if [ ! -z ${SLACK_WEBHOOK} ]
 then
-	curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"Action Script Execution: ${1}\"}" https://hooks.slack.com/services/${SLACK_WEBHOOK}
+	curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"Action Script Execution: ${1}\"}" ${SLACK_WEBHOOK}
 fi
