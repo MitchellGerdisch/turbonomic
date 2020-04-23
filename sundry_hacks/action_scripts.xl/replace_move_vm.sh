@@ -1,4 +1,5 @@
 #!/bin/sh
+basedir=$(dirname $0)
 msg="REPLACE MOVE VM; VM: ${VMT_TARGET_NAME}" 
 echo `date` "${msg}" >> /tmp/output_actionscript.out
-`pwd`/slack.sh "${msg}"
+${basedir}/slack.sh "${msg}"
