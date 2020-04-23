@@ -40,7 +40,12 @@ async function createActionScriptPolicy(group_name, policy_name) {
 	        'Content-Type': 'application/json'
 	      }
 	})
+	policy = await response.json()
 	
+	console.log("*** Policy configuration. If you don't see the action scripts in this json, something went wrong.")
+	console.log("")
+	console.log(JSON.stringify(policy))
+	console.log("")
 	console.log("*** Orchestration Policy, "+policy_name+", for group, "+group_name+", created.")
 }
 
