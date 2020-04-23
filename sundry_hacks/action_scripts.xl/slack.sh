@@ -13,6 +13,8 @@
 # - SLACK_WEBHOOK: this environment variable contains the entire webhook URL (e.g. https://hooks.slack.com/services/XXXXX/YYYYYYYYYYYYYY)
 # 
 
+# This sets the SLACK_WEBHOOK environment variable if you added it to your .bash_profile
+. $HOME/.bash_profile
 
 if [ ! -z ${SLACK_WEBHOOK} ]
 then
