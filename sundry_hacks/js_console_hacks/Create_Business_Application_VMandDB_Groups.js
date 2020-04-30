@@ -82,6 +82,7 @@ async function BuildBusAppGroup(scope_id) {
 	const group_name_keyword = "BusApp"
 
 	busappinfo = await getBusAppInfo(scope_id)
+	console.log("busappinfo: "+JSON.stringify(busappinfo))
 	if (busappinfo.length > 0) {
 		busappinfo.forEach(function (item, index) {
 			if (item.className == "BusinessApplication") {
@@ -167,9 +168,27 @@ async function CreateUpdate_Group(group_url, api_method, body) {
 
 /* Looks at current UI page and grabs the scope ID */
 async function getBusAppInfo(scope_id) {
-	response = await fetch('/vmturbo/rest/search/?q=&scopes='+scope_id)
+	console.log("scope: "+scope_id)
+	response = await fetch('/vmturbo/rest/search?q=&types=BusinessApplication&scopes='+scope_id)
 	return await response.json()
 }
+
+vmturbo/rest/search/?ascending=false&disable_hateoas=true&limit=20&order_by=severity&q=
+	
+	************** for VMs
+	https://10.30.172.17/vmturbo/rest/search/?ascending=false&aspect_names=cloudAspect&disable_hateoas=true&limit=20&order_by=severity&q=
+	{
+		  "criteriaList": [
+		    
+		  ],
+		  "logicalOperator": "AND",
+		  "className": "VirtualMachine",
+		  "environmentType": "HYBRID",
+		  "scope": [
+		    "284547951815392" /* UUID */
+		  ]
+		}
+***************
 
 /* Returns search list of Business Applications */
 async function getBusAppsList() {
