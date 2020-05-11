@@ -10,8 +10,6 @@
  * It will autorun.
  */
 
-
-
 /* Autorun the script */
 CreateClusterGroups()
 
@@ -30,124 +28,64 @@ async function CreateClusterGroups(param) {
 }
 
 async function buildClusterGroups(cluster_name, cluster_uuid) {
-	var cluster_vms = []
-	var cluster_pms = []
-	const group_name_keyword = "Cluster"
-		
-	cluster_pms = await getClusterEntities("PMs", cluster_uuid)
-	cluster_vms = await getClusterEntities("VMs", cluster_uuid)
-
-		
 	console.log("Cluster Name: "+cluster_name)
-	console.log("VMs in Cluster: " + ((cluster_vms.length > 0) ? cluster_vms : "NONE FOUND"))
-	console.log("PMs in Cluster: " + ((cluster_pms.length > 0) ? cluster_pms : "NONE FOUND"))
+	const group_name_keyword = "Cluster"
+	var group_name
+	var filter_type
+	var group_type
+
+	/* Build Cluster VM group */
+	group_name = "VMs_"+ group_name_keyword+"_"+cluster_name
+	filter_type = "vmsByClusterName"
+	group_type = "VirtualMachine"
+	await CreateUpdate_Group(cluster_name, group_name, filter_type, group_type) 
 	
-	group_url = '/vmturbo/rest/groups'
-	/*group_url = '/api/v2/groups'*/
-	/*search_url = '/api/v2/search?q='*/
-
-	/* Did we find any VMs in the cluster? */
-	if (cluster_vms.length > 0) {
-		group_name = "VMs_"+ group_name_keyword+"_"+cluster_name
-		vms_group_body = {
-			"isStatic": true,
-			"displayName": group_name,
-			"memberUuidList": cluster_vms,
-			"criteriaList": [],
-			"groupType": "VirtualMachine"
-		}
-		
-		/* Either create a new group of Cluster VMs or update the existing group if it already exists. */
-		group_uuid = await getUuid("Group", group_name)
-		if (group_uuid) {
-			/* Found an existing group, so update it. */
-			await CreateUpdate_Group(group_url+"/"+group_uuid, 'PUT', vms_group_body) 
-			console.log("Updated VM Group: "+group_name)
-		} else {
-			/* Create a new group */
-			await CreateUpdate_Group(group_url, 'POST', vms_group_body) 
-			console.log("Created VM Group: "+group_name)
-		}
-	}
-
-	/* Did we find any PMs in the Cluster? */
-	if (cluster_pms.length > 0) {
-		group_name = "PMs_"+group_name_keyword+"_"+cluster_name
-
-		pms_group_body = {
-			"isStatic": true,
-			"displayName": group_name,
-			"memberUuidList": cluster_pms,
-			"criteriaList": [],
-			"groupType": "PhysicalMachine"
-		}
-		
-		/* Either create a new group of Cluster PMs or update the existing group if it already exists. */
-		group_uuid = await getUuid("Group", group_name)
-		if (group_uuid) {
-			/* Found an existing group, so update it. */
-			await CreateUpdate_Group(group_url+"/"+group_uuid, 'PUT', pms_group_body) 
-			console.log("Updated PM Group: "+group_name)
-		} else {
-			/* Create a new group */
-			await CreateUpdate_Group(group_url, 'POST', pms_group_body) 
-			console.log("Created PM Group: "+group_name)
-		}
-	}
+	/* Build Cluster host group */
+	group_name = "PMs_"+group_name_keyword+"_"+cluster_name
+	filter_type = "pmsByClusterName"
+	group_type = "PhysicalMachine"
+	await CreateUpdate_Group(cluster_name, group_name, filter_type, group_type) 
 } 
 
-async function CreateUpdate_Group(group_url, api_method, body) {
+async function CreateUpdate_Group(cluster_name, group_name, filter_type, group_type) {
+	console.log("Group, "+group_name+" ...")
+	var group_url = '/vmturbo/rest/groups'
+	var api_method = "POST"
+	/* Check if the group already exists and if so, make this an update instead of a create */
+	group_uuid = await getUuid("Group", group_name)
+	if (group_uuid) {
+		/* Found an existing group, so update it. */
+		group_url = group_url+"/"+group_uuid
+		api_method = 'PUT'
+	}
+
+	/* Create a dynamic group based on the cluster name */
+	var group_body = {
+		"isStatic": false,
+		"displayName": group_name,
+		"memberUuidList": [],
+		"criteriaList": [{
+			"expType": "RXEQ",
+			"expVal": "^"+cluster_name+"$",
+			"filterType": filter_type,
+			"caseSensitive": false
+		}],
+		"groupType": group_type
+	}
 	
 	response = await fetch(group_url, {
 		method: api_method,
-		body: JSON.stringify(body),
+		body: JSON.stringify(group_body),
 	    headers: {
 	        'Content-Type': 'application/json'
 	      }
 	})
+	
+	console.log((group_uuid ? "... updated." : "... created."))
 } 
 
-/* get list of UUIDs for given type of entity for given cluster */
-async function getClusterEntities(entity_type, search_scope_uuid) {
-	
-	if (entity_type == "PMs") {
-		class_name = "PhysicalMachine"
-	} else if (entity_type == "VMs") {
-		class_name = "VirtualMachine"
-	} else {
-		console.log("*** ERROR *** getClusterEntities called with wrong entity_type: " + entity_type)
-		return
-	}
-
-	search_body = {
-		"criteriaList": [],
-		"logicalOperator": "AND",
-		"className": class_name,
-		"environmentType": "ONPREM",
-		"scope": [
-		   search_scope_uuid 
-		]
-	}	
-	response = await fetch('/vmturbo/rest/search/?q=', {
-		method: 'POST',
-		body: JSON.stringify(search_body),
-	    headers: {
-	        'Content-Type': 'application/json'
-	      }
-	})
-
-	cluster_entities = await response.json()
-	
-	entity_uuids = []
-	for (i = 0; i < cluster_entities.length; i++) {
-		entity_uuids.push(cluster_entities[i].uuid)
-	}
-	return entity_uuids
-}
-
-/* Returns search list of Business Applications */
+/* Returns search list of Clusters. */
 async function getClustersList() {
-	/*search_url = '/api/v2/search?types=BusinessApplication'*/
 	search_url = '/vmturbo/rest/search?types=Cluster'
 	response = await fetch(search_url)
 	clusters = await response.json()
