@@ -64,30 +64,33 @@ async function findRiImprovingActions(market) {
 		
 		/* Only care about cloud-related actions that are VM scaling events */
 		if (action.target.hasOwnProperty('aspects') && (action.target.aspects.hasOwnProperty('cloudAspect')) && (action.actionType == "SCALE") && (action.target.className == "VirtualMachine")) {
-			
+
 			/* we need to get the details for the action to see RI coverage */
 			response = await fetch('/api/v3/actions/'+action.uuid+'/details')
 			action_details = await response.json()
 			
-			/* do some math to see if RI usage improves because of this action */
-			before_ri_capacity = action_details.riCoverageBefore.capacity.avg
-			before_ri_usage = action_details.riCoverageBefore.value
-			before_ri_utilization = Math.round((before_ri_usage/before_ri_capacity)*100)
-
-			after_ri_capacity = action_details.riCoverageAfter.capacity.avg
-			after_ri_usage = action_details.riCoverageAfter.value
-			after_ri_utilization = Math.round((after_ri_usage/after_ri_capacity)*100)
-			
-			if (after_ri_utilization > before_ri_utilization) { 
-				/* we got a good one */
-				ri_improving_actions.push({
-					"instance_name": action.target.displayName,
-					"account_name": action.currentLocation.discoveredBy.displayName,
-					"current_ri_util": before_ri_utilization,
-					"new_ri_util": after_ri_utilization,
-					"action": action.details,
-					"reason": action.risk.subCategory
-				})
+			/* Check if any RI coverage information is available. */
+			if ((action_details.riCoverageBefore) && (action_details.riCoverageAfter)) {
+				/* do some math to see if RI usage improves because of this action */
+				before_ri_capacity = action_details.riCoverageBefore.capacity.avg
+				before_ri_usage = action_details.riCoverageBefore.value
+				before_ri_utilization = Math.round((before_ri_usage/before_ri_capacity)*100)
+	
+				after_ri_capacity = action_details.riCoverageAfter.capacity.avg
+				after_ri_usage = action_details.riCoverageAfter.value
+				after_ri_utilization = Math.round((after_ri_usage/after_ri_capacity)*100)
+				
+				if (after_ri_utilization > before_ri_utilization) { 
+					/* we got a good one */
+					ri_improving_actions.push({
+						"instance_name": action.target.displayName,
+						"account_name": action.currentLocation.discoveredBy.displayName,
+						"current_ri_util": before_ri_utilization,
+						"new_ri_util": after_ri_utilization,
+						"action": action.details,
+						"reason": action.risk.subCategory
+					})
+				}
 			}
 		}
 	}
