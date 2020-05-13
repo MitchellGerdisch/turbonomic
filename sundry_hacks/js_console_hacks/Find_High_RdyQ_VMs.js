@@ -148,7 +148,7 @@ async function getVMs() {
 	 	 "environmentType": "ONPREM",
 	 	 "scope": null
 	 }
-	 response = await fetch('/v2/search/?ascending=false&disable_hateoas=true&order_by=severity&q=', {
+	 response = await fetch('/api/v2/search/?ascending=false&disable_hateoas=true&order_by=severity&q=', {
 	 	 method: 'POST',
 	 	 body: JSON.stringify(request_body),
 	 	 headers: {
