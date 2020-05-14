@@ -25,11 +25,12 @@ async function getRIimprovingActions_xl() {
 		console.log("*** Found some RI utilization improving actions ...")
 
 		csvContent = "data:text/csv;charset=utf-8,";
-		csvContent += "Instance Name,Account Name,Current RI Utilization,New RI Utilization,Action,Reason\n" 
+		csvContent += "Instance Name,Account Name,Instance ID,Current RI Utilization,New RI Utilization,Action,Reason\n" 
 		
 		for (i = 0; i < ri_improving_actions.length; i++) {
 			ri_action = ri_improving_actions[i]
 			instance = ri_action.instance_name
+			instance_id = ri_action.instance_id
 			account = ri_action.account_name
 			current_ri = ri_action.current_ri_util
 			new_ri = ri_action.new_ri_util
@@ -38,11 +39,12 @@ async function getRIimprovingActions_xl() {
 			
 			console.log("Instance Name: "+ instance); 
 			console.log("- Account Name: "+ account);
+			console.log("- Instance ID: "+ instance_id);
 			console.log("- Current RI Utilization: "+ current_ri);
 			console.log("- New RI Utilization: " + new_ri);
 			console.log("- Action: " + action);
 			console.log("- Reason: " + reason);
-			csvContent += instance + "," + account + "," + current_ri + "," + new_ri + "," + action + "," + reason + "\n"
+			csvContent += instance + "," + account + "," + instance_id + "," + current_ri + "," + new_ri + "," + action + "," + reason + "\n"
 		}
 
 		console.log("*** Downloading CSV containing RI-improving actions.")
@@ -85,6 +87,7 @@ async function findRiImprovingActions(market) {
 					ri_improving_actions.push({
 						"instance_name": action.target.displayName,
 						"account_name": action.currentLocation.discoveredBy.displayName,
+						"instance_id": Object.values(action.target.vendorIds)[0],
 						"current_ri_util": before_ri_utilization,
 						"new_ri_util": after_ri_utilization,
 						"action": action.details,
