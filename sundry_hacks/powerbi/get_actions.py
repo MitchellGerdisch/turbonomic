@@ -1,9 +1,18 @@
+##### NOTE NOTE NOTE #####
+# This script works for the most part. It requires loading it in powerbi desktop and then modifying the query so it can use
+# the powerbi parameters. It's described in the initial value of actions_info[].
+# That all said, it's not that great overall but being kept for reference.
+# The decision was made to push data into PowerBi using a Power BI streaming dataset. See colocated powershell script for more.
+#####
+
+
+
 # This python script is meant to be run in PowerBI desktop.
 # It produces pandas dataframes formatted output which can then be used as a datasource in PowerBI.
 # 
 # Prereqs:
 # - PowerBI desktop
-# - Python 3.8 installed and pandas and matplotlib python modules installed.
+# - Python 3.8 installed and pandas, matplotlib python modules installed.
 
 import pandas as pd
 import json
@@ -23,12 +32,9 @@ def get_json_from_url_turbo(url):
     else:
         js = None
         print(str(DT.now()), "API Call Failed:", response.status_code, "\n", url, "\n")
-        #Uncomment to see API response for error
-        #print(response.text)
     return js
 
 
-# placeholder
 actions_info = [{"instructions":"go to advanced editor and put \'\" around parameter settings and refresh"}]
 
 ### Need to modify in PowerBI definition so that they have single and then double quotes around them: '"...."'
