@@ -1,6 +1,16 @@
 <#
 .SYNOPSIS 
 
+.DESCRIPTION
+Pushes records to Power BI streaming dataset that provide application-server-actions information.
+Requires a Power BI streaming dataset defined with the following fields:
+- Timestamp (DateTime)
+- Component_ID (Text)
+- Server_Name (Text)
+- Action_Details (Text)
+- Action_From (Text)
+- Action_To (Text)
+
 .EXAMPLE
 PushTurboActions_PowerBI.ps1 -TurboInstance turbonomic.mycompany.com -TurboCredential $TurboCred -PowerBiCredential $PowerBiKey -AppServerMapCsv appserver.csv
 For the servers associated with each applicatin found in the provided CSV, this script will push a separate row of data to the given Power BI stream 
