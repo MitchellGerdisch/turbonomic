@@ -67,10 +67,10 @@ function _SetCertPolicy {
     }
 }
 
-function turboLogin($TurboInstance, $TurboCredential) {
+function TurboLogin($turboInstance, $turboCredential) {
 	
-	$TurboPassword = $TurboCredential.GetNetworkCredential().password
-	$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f $TurboCredential.username,$TurboPassword)))
+	$turboPassword = $turboCredential.GetNetworkCredential().password
+	$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f $turboCredential.username,$turboPassword)))
 	
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", "Basic $base64AuthInfo")
@@ -78,51 +78,54 @@ function turboLogin($TurboInstance, $TurboCredential) {
 	$multipartContent = [System.Net.Http.MultipartFormDataContent]::new()
 	$stringHeader = [System.Net.Http.Headers.ContentDispositionHeaderValue]::new("form-data")
 	$stringHeader.Name = "username"
-	$StringContent = [System.Net.Http.StringContent]::new($TurboCredential.username)
+	$StringContent = [System.Net.Http.StringContent]::new($turboCredential.username)
 	$StringContent.Headers.ContentDisposition = $stringHeader
 	$multipartContent.Add($stringContent)
 
 	$stringHeader = [System.Net.Http.Headers.ContentDispositionHeaderValue]::new("form-data")
 	$stringHeader.Name = "password"
-	$StringContent = [System.Net.Http.StringContent]::new($TurboPassword)
+	$StringContent = [System.Net.Http.StringContent]::new($turboPassword)
 	$StringContent.Headers.ContentDisposition = $stringHeader
 	$multipartContent.Add($stringContent)
 
 	$body = $multipartContent
 
-	$response = Invoke-WebRequest "https://$TurboInstance/vmturbo/rest/login" -Method "POST" -Headers $headers -Body $body 
+	$response = Invoke-WebRequest "https://$turboInstance/vmturbo/rest/login" -Method "POST" -Headers $headers -Body $body 
 	$jessionid = $response.Headers["Set-Cookie"].split(";")[0]
+	
+	# Return the cookie for future API calls
 	$jessionid	
 }
 
 # Process the CSV and return an array of JSON data that provides a mapping of the application and related servers.
 # This is mostly done to allow for future mechanisms (e.g. API calls) to get this data instead of using a CSV file.
-function BuildAppServerMapping($AppServerMapCsv) {
+function BuildAppServerMapping($appServerMapCsv) {
 	
-	Write-Debug -Message "CSV Path: $AppServerMapCsv"
+	Write-Debug -Message "CSV Path: $appServerMapCsv"
 	
 	# Gather the CSV into JSON format for processing
-	$CSV_JSON = Import-Csv $AppServerMapCsv |  ConvertTo-Json  | ConvertFrom-Json
+	$csvJson = Import-Csv $appServerMapCsv |  ConvertTo-Json  | ConvertFrom-Json
 	
-	$AppServerMapping = @{}
-	foreach ($item in $CSV_JSON) {
+	$appServerMapping = @{}
+	foreach ($item in $csvJson) {
 		$component_id = $item."Component_id"
-		$server_name = $item."Server_Name"
-		if (-Not $AppServerMapping.ContainsKey($component_id)) {
+		$serverName = $item."Server_Name"
+		if (-Not $appServerMapping.ContainsKey($component_id)) {
 			# first time finding this component_id, so initialize the associated array
-			$AppServerMapping.add($component_id, @{$server_name=@()}) 
+			$appServerMapping.add($component_id, @{$serverName=@()}) 
 		} else {
-			if (-Not $AppServermapping.$component_id.ContainsKey($server_name)) { # protects against a given app having the same server name twice. shouldn't happen
-				$AppServerMapping.$component_id.add($server_name, @())
+			if (-Not $appServermapping.$component_id.ContainsKey($serverName)) { # protects against a given app having the same server name twice. shouldn't happen
+				$appServerMapping.$component_id.add($serverName, @())
 			}
 		}
 	}	
 	
-	$AppServerMapping
+	# Return the mapping
+	$appServerMapping
 }
 
 # Get UUID for the VM
-function getTurboVmId($entityName, $turboInstance, $authorization) {
+function GetTurboVmId($entityName, $turboInstance, $authorization) {
 	
 	$searchDTO = @{
 		"criteriaList" = @(
@@ -143,24 +146,24 @@ function getTurboVmId($entityName, $turboInstance, $authorization) {
 	
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     try {
-		$SearchResponse = Invoke-RestMethod -Uri $uri -Method Post -Headers @{Cookie=("{0}" -f $authorization); "Content-Type"="application/json"} -Body $searchDTOJson 
-		$VmId = $SearchResponse[0].uuid
+		$searchResponse = Invoke-RestMethod -Uri $uri -Method Post -Headers @{Cookie=("{0}" -f $authorization); "Content-Type"="application/json"} -Body $searchDTOJson 
+		$vmId = $searchResponse[0].uuid
 	} catch {
 		Write-Host "Turbonomic API: Error searching for VM, $entityName"
 		Write-Host "StatusCode:" $_.Exception.Response.StatusCode.value__ 
     	Write-Host "StatusDescription:" $_.Exception.Response.ReasonPhrase
 	}
 	
-	$VmId
+	$vmId
 }
 
 # Get actions for the given UUID
-function getServerActions($server_name, $server_uuid, $turboInstance, $authorization) {
+function GetServerActions($serverName, $serverUuid, $turboInstance, $authorization) {
 	Write-Debug -Message "In getActions"
 	
-	$entity_actions = @()
-	$uri = "https://{0}/vmturbo/rest/entities/{1}/actions" -f $turboInstance, $server_uuid
-	#$uri = "https://{0}/api/v3/entities/{1}/actions?order_by=severity&ascending=true" -f $turboInstance, $server_uuid
+	$entityActions = @()
+	$uri = "https://{0}/vmturbo/rest/entities/{1}/actions" -f $turboInstance, $serverUuid
+	#$uri = "https://{0}/api/v3/entities/{1}/actions?order_by=severity&ascending=true" -f $turboInstance, $serverUuid
 	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     try {
     	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
@@ -168,22 +171,22 @@ function getServerActions($server_name, $server_uuid, $turboInstance, $authoriza
 		$resp = Invoke-RestMethod $uri -Method 'GET' -Headers $headers 
 
 		$resp | ForEach-Object {
-			$action_object = $_ 
-			if ($action_object.target.environmentType -eq "CLOUD") {
-				$action_from = $action_object.currentEntity.displayName
-				$action_to = $action_object.newEntity.displayName
+			$actionObject = $_ 
+			if ($actionObject.target.environmentType -eq "CLOUD") {
+				$actionFrom = $actionObject.currentEntity.displayName
+				$actionTo = $actionObject.newEntity.displayName
 			} else {
-				$action_from = "NA"
-				$action_to = "NA"
+				$actionFrom = "NA"
+				$actionTo = "NA"
 			}
 			$action_hash = @{
-				"action_target" = $server_name;
-				"action_uuid" = $action_object.uuid;
-				"action_details" = $action_object.details; 
-				"action_from" = $action_from;
-				"action_to" = $action_to;
+				"action_target" = $serverName;
+				"action_uuid" = $actionObject.uuid;
+				"action_details" = $actionObject.details; 
+				"action_from" = $actionFrom;
+				"action_to" = $actionTo;
 			}
-			$entity_actions += $action_hash
+			$entityActions += $action_hash
 		}
 	} catch {
 		Write-Host "Turbonomic API: Error getting actions for UUID, $uuid"
@@ -191,57 +194,56 @@ function getServerActions($server_name, $server_uuid, $turboInstance, $authoriza
     	Write-Host "StatusDescription:" $_.Exception.Response.ReasonPhrase
 	}
 	
-	$entity_actions
+	$entityActions
 }
 
 
 # Cycles throught the App-Server mapping and collects actions for each App's servers.
-function GetAppActions($AppServerMapping, $TurboInstance, $TurboCredential) {
+function GetAppActions($appServerMapping, $turboInstance, $turboCredential) {
 	# Authenticate
-	$auth = turboLogin $TurboInstance $TurboCredential
+	$auth = TurboLogin $turboInstance $turboCredential
 	
 	# Go through the hash and for each app find the servers and for each server find any actions.
 	# And build a hash that maps each app to an array of hashes that represent each action for each server.
-	$appids = $AppServerMapping.Keys
-	$app_actions = @{}
-	foreach ($appid in $appids) {
-		Write-Debug -Message "appid: $appid"
-		$app_server_actions = @()
-		$app_servers = $AppServerMapping.$appid.Keys
-		foreach ($app_server in $app_servers) {
-			Write-Debug -Message "server: $app_server"
-			$app_server_id = getTurboVmId $app_server $TurboInstance $auth
-			if ($app_server_id) {
-				Write-Debug -Message "VM: $app_server; UUID: $app_server_id"
-				$server_actions = getServerActions $app_server $app_server_id $TurboInstance $auth
-				$app_actions[$appid] += @($server_actions)
+	$appIds = $appServerMapping.Keys
+	$appActions = @{}
+	foreach ($appId in $appIds) {
+		Write-Debug -Message "appId: $appId"
+		$appServers = $AppServerMapping.$appId.Keys
+		foreach ($appServer in $appServers) {
+			Write-Debug -Message "server: $appServer"
+			$appServerId = GetTurboVmId $appServer $turboInstance $auth
+			if ($appServerId) {
+				Write-Debug -Message "VM: $appServer; UUID: $appServerId"
+				$serverActions = GetServerActions $appServer $appServerId $turboInstance $auth
+				$appActions[$appId] += @($serverActions)
 			}
 		}
 	}
-	$app_actions
+	$appActions
 }
 
 # Take the array of app-specific hashes of actions and send to power bi
 # It will push a row of data for each action and add a timestamp
-function pushToPowerBi($PowerBiStreamUrl, $AppServerActions) {
+function PushToPowerBi($powerBiStreamUrl, $appServerActions) {
 
 	$timestamp = (Get-Date -UFormat "%Y-%m-%dT%R:00.000Z").ToString()
 	Write-Debug "Timestamp: $timestamp"
 		
-	$apps = $AppServerActions.Keys
+	$apps = $appServerActions.Keys
 	foreach ($app in $apps) {
-		$AppServerActions[$app] | ForEach-Object {
-			$action_row = $_
+		$appServerActions[$app] | ForEach-Object {
+			$actionRow = $_
 			$payload = @{
 				"Timestamp" = $timestamp;
 				"Component_ID" = $app;
-				"Server_Name" = $action_row.action_target;
-				"Action_Details" = $action_row.action_details;
-				"Action_From" = $action_row.action_from;
-				"Action_To" = $action_row.action_to;
+				"Server_Name" = $actionRow.action_target;
+				"Action_Details" = $actionRow.action_details;
+				"Action_From" = $actionRow.action_from;
+				"Action_To" = $actionRow.action_to;
 			}
-			Write-Debug "Sending row for app: $app; vm: $action_row.action_target"
-			Invoke-RestMethod -Method Post -Uri $PowerBiStreamUrl -Body (ConvertTo-Json @($payload))
+			Write-Debug "Sending row for app: $app; vm: $actionRow.action_target"
+			Invoke-RestMethod -Method Post -Uri $powerBiStreamUrl -Body (ConvertTo-Json @($payload))
 		}
 	}
 }	
@@ -279,12 +281,6 @@ $AppServerMapping = BuildAppServerMapping $AppServerMapCsv
 $AppActions = GetAppActions $AppServerMapping $TurboInstance $TurboCredential 
 
 # Send the actions up to the Power BI stream dataset
-pushToPowerBi $PowerBiStreamUrl $AppActions
+PushToPowerBi $PowerBiStreamUrl $AppActions
 
 
-### DEBUGGING STUFF ###
-#foreach ($key in $AppServerActions.Keys) {
-	#Write-Debug -Message "key: $key"
-#}
-	
-	
