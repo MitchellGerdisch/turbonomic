@@ -11,6 +11,8 @@ import (
     "crypto/tls"
     "flag"
     "os"
+    "encoding/csv"
+    "io"
     //"reflect"
 )
 
@@ -41,6 +43,11 @@ type Action struct {
 	actionTo string
 }
 
+type AppServer struct {
+	appId string
+	serverActions []Action
+}
+
 func main() {
 
 	// command line arguments
@@ -67,6 +74,46 @@ func main() {
 
 // need logic to get csv mapping info and
 // loop through and get vm id and actions and build that mapping to app
+
+	appservercsv, err := os.Open(*csv_file)
+	if (err != nil) {
+		fmt.Println("*** Error opening file: "+ *csv_file)
+		os.Exit(5)
+	}
+
+	readfile := csv.NewReader(appservercsv)
+	
+	for {
+		record, err := readfile.Read()
+		if (err == io.EOF) {
+			break
+		}	
+		
+		if (err != nil) {
+			fmt.Println("*** Failed to read a record in CSV file.") 
+		}
+		
+		// Find the Server_Name and Component_id columns
+		var sn_index int
+		var ci_index int
+
+		for index,content := range record {
+			if (content == "Server_Name") {
+				sn_index = index	
+			} else if (content == "Component_id") {
+				ci_index = index
+			} else {
+				
+			}
+
+		} 
+		
+		
+		
+		
+		fmt.Println(record)
+	}
+
 
 	//server_name := "turbonomic-7.21.5-DS"
 	server_name := "MiniHost"
@@ -109,7 +156,6 @@ func getServerActions (turbo_instance string, server_name string, server_id stri
 	defer res.Body.Close()
 	// essentially creates a stringified version of the body's json
 	body, _ := ioutil.ReadAll(res.Body)
-	//fmt.Println(string(body))
 	
 	// Since the search results is an array of json,
 	// Create an array of one of these interface things to unmarshal the stringified json into
@@ -119,25 +165,22 @@ func getServerActions (turbo_instance string, server_name string, server_id stri
 		fmt.Println(err)
     	os.Exit(4)
 	}
-	
+
 	var serverActions []Action
-	for i, _ := range responseActions {
-		responseAction := responseActions[i]
-		serverActions[i].actionUuid = responseAction["uuid"].(string)
-		serverActions[i].actionTarget = responseAction["target"]["displayName"].(string)
-		serverActions[i].actionDetails = responseAction["details"].(string)
-		if  (responseAction["target"]["environmentType"] == "CLOUD") {
-			serverActions[i].actionFrom = responseAction["currentEntity"]["displayName"].(string)
-			serverActions[i].actionTo = responseAction["newEntity"]["displayName"].(string)
+	for _, responseAction := range responseActions {
+		var serverAction Action
+		serverAction.actionUuid = responseAction["uuid"].(string)
+		serverAction.actionTarget = responseAction["target"].(map[string]interface{})["displayName"].(string)
+		serverAction.actionDetails = responseAction["details"].(string)
+		if  (responseAction["target"].(map[string]interface{})["environmentType"] == "CLOUD") {
+			serverAction.actionFrom = responseAction["currentEntity"].(map[string]interface{})["displayName"].(string)
+			serverAction.actionTo = responseAction["newEntity"].(map[string]interface{})["displayName"].(string)
 		} else {
-			serverActions[i].actionFrom = "NA"
-			serverActions[i].actionTo = "NA"
+			serverAction.actionFrom = "NA"
+			serverAction.actionTo = "NA"
 		}
+		serverActions = append(serverActions, serverAction)
 	}
-	// now searchResults is an array of structures that we can index.
-	// There's only one result so we're hardcoding the array index and we only care about the uuid
-	//fmt.Println("searchResults")
-	//fmt.Println(searchResults[0]["uuid"])
 	
 	return serverActions
 }	
