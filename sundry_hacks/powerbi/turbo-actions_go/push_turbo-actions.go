@@ -83,6 +83,19 @@ func main() {
 
 	readfile := csv.NewReader(appservercsv)
 	
+	var [][]appServerRecords string // This holds all the records from the CSV file that contain app and servers
+	appServerRecords = getAppServerRecords(*csv_file)
+	var ci_index string // This holds 
+	var sn_index string
+	ci_index, sn_index, records := get
+	
+	var []appServers AppServer
+	currentAppServerIndex := 0  // index into appServers for given app
+	currentAppName := "nowayanythingisnamedthis"
+	currentServerName := "nowayanythingisnamedthiseither"
+	var []serverActions Action
+	var server string
+	
 	for {
 		record, err := readfile.Read()
 		if (err == io.EOF) {
@@ -96,17 +109,34 @@ func main() {
 		// Find the Server_Name and Component_id columns
 		var sn_index int
 		var ci_index int
+		// first time through
+		if ((sn_index == nil) || (ci_index == nil)) {
+			for index,content := range record {
+				if (content == "Server_Name") {
+					sn_index = index	
+				} else if (content == "Component_id") {
+					ci_index = index
+			} 
+		} else {
+			// process the record for the app and server name
+			record_app = record[ci_index]
+			record_server = record[sn_index]
+			if (currentAppName != record_app)	 {
+				// This is a new app than the last one. So start a new entry in the appServer array	
 
-		for index,content := range record {
-			if (content == "Server_Name") {
-				sn_index = index	
-			} else if (content == "Component_id") {
-				ci_index = index
 			} else {
+				// Still processing servers for the same app. So append actions to the current appServer array entry
 				
 			}
-
-		} 
+				
+			
+			
+		}
+		
+		if ()
+		
+			
+		
 		
 		
 		
@@ -128,6 +158,73 @@ func main() {
 	
 
 }	
+
+func getAppServerRecords(csv_file string) [][]string {
+
+	// Open the file
+	appservercsv, err := os.Open(csv_file)
+	if (err != nil) {
+		fmt.Println("*** Error opening file: "+ *csv_file)
+		os.Exit(5)
+	}
+	readfile := csv.NewReader(appservercsv)
+	
+	var [][]appServerRecords string // This holds all the records from the CSV file that contain app and servers
+	appServerRecords = getAppServerRecords(*csv_file)
+	var ci_index string // This holds 
+	var sn_index string
+	ci_index, sn_index, records := get
+	
+	var []appServers AppServer
+	currentAppServerIndex := 0  // index into appServers for given app
+	currentAppName := "nowayanythingisnamedthis"
+	currentServerName := "nowayanythingisnamedthiseither"
+	var []serverActions Action
+	var server string
+	
+	for {
+		record, err := readfile.Read()
+		if (err == io.EOF) {
+			break
+		}	
+		
+		if (err != nil) {
+			fmt.Println("*** Failed to read a record in CSV file.") 
+		}
+		
+		// Find the Server_Name and Component_id columns
+		var sn_index int
+		var ci_index int
+		// first time through
+		if ((sn_index == nil) || (ci_index == nil)) {
+			for index,content := range record {
+				if (content == "Server_Name") {
+					sn_index = index	
+				} else if (content == "Component_id") {
+					ci_index = index
+			} 
+		} else {
+			// process the record for the app and server name
+			record_app = record[ci_index]
+			record_server = record[sn_index]
+			if (currentAppName != record_app)	 {
+				// This is a new app than the last one. So start a new entry in the appServer array	
+
+			} else {
+				// Still processing servers for the same app. So append actions to the current appServer array entry
+				
+			}
+				
+			
+			
+		}
+		
+		if ()
+		
+				
+	
+	
+}
 
 
 // Get actions for given server UUID
