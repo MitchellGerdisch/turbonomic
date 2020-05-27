@@ -1,5 +1,47 @@
 package main
 
+/*
+.SYNOPSIS 
+
+.DESCRIPTION
+Pushes records to Power BI streaming dataset that provide application-server-actions information.
+Requires a Power BI streaming dataset defined with the following fields:
+- Timestamp (DateTime)
+- Component_ID (Text)
+- Server_Name (Text)
+- Action_Details (Text)
+- Action_From (Text)
+- Action_To (Text)
+
+.EXAMPLE
+PushTurboActions_PowerBI.ps1 -TurboInstance turbonomic.mycompany.com -TurboCredential $TurboCred -PowerBiCredential $PowerBiKey -AppServerMapCsv appserver.csv
+For the servers associated with each applicatin found in the provided CSV, this script will push a separate row of data to the given Power BI stream 
+where each row provides the application, the server and action data.
+
+.PARAMETER turbo_instance
+Specify the Turbonomic server hostname, FQDN, or IP address where you are adding the targets.
+
+.PARAMETER turbo_user
+Specify the username for accessing Turbo. 
+
+.PARAMETER turbo_password
+Specify the password for accessing Turbo. 
+
+.PARAMETER powerbi_stream_url
+Currently, this is the URL with the key that one gets when creating a Streaming DataSet set in PowerBI.
+(Eventually, this may be replaced with a PowerBI API credentials as configured via registering an app from dev.powerbi.com or a service prinicipal creds.)
+
+.PARAMETER csv_file
+Specify the path to a CSV that contains at least two columns: 
+- Component_Id: This is the Application identifier
+- Server_Name: This is the server associated with the given component_id.
+Note this parameter may become vestigial or replaced once there is an API to get this information.
+
+CROSS-COMPLIATION NOTES
+env GOOS=windows GOARCH=amd64 go build ./push_turbo-actions.go
+
+*/
+
 import (
     "bytes"
  	"mime/multipart"
@@ -13,44 +55,30 @@ import (
     "os"
     "encoding/csv"
     "io"
+    "time"
     //"reflect"
 )
 
-/* Currently not using these structures and instead using the map/interface unstructured approach to the API JSON
-type CriteriaList struct {
-	expType string 
-	expVal string 
-	filterType string 
-	caseSensitive bool
-}
-type SearchBody struct {
-	criteriaList CriteriaList 
-	logicalOperator string 
-	className string 
-}
-
-type SearchResult struct {
-	uuid string
-	displayName string
-}
-*/
-
 type Action struct {
-	actionTarget string
 	actionUuid string
 	actionDetails string
 	actionFrom string
 	actionTo string
 }
 
-type AppServer struct {
+type ServerAction struct {
+	serverName string
+	serverUuid string
+	actions []Action
+}
+
+type AppServerMapping struct {
 	appId string
-	serverActions []Action
+	serverActions []ServerAction
 }
 
 func main() {
-
-	// command line arguments
+	// Process command line arguments
 	turbo_user := flag.String("turbo_user", "", "Turbo Username")
 	turbo_password:= flag.String("turbo_password", "", "Turbo Password")
 	turbo_instance := flag.String("turbo_instance", "", "Turbo IP or FQDN")
@@ -67,169 +95,203 @@ func main() {
 		os.Exit(1)
 	}
 	// end command line arguments
+	
+	// Process the CSV file to extract the Application to Server Mapping
+	fmt.Println("Processing CSV file for application to server mapping ...")
+	var appServerMapping  []AppServerMapping
+	appServerMapping = getAppServerMapping(*csv_file)
 
-	// Turbo authentication
-	jsessionidCookie := turboLogin(*turbo_instance, *turbo_user, *turbo_password) 
 
+	// Call Turbo to get any actions for the servers assigned to each application
+	fmt.Println("Getting actions from Turbo ...")
+	appServerMapping = addAppServerActions(appServerMapping, *turbo_instance, *turbo_user, *turbo_password)
 
-// need logic to get csv mapping info and
-// loop through and get vm id and actions and build that mapping to app
+	// Call PowerBI API to push data to the stream dataset
+	fmt.Println("Sending records to PowerBI ...")
+	pushPowerBiData(appServerMapping, *powerbi_stream_url)
+	
+	fmt.Println("Done.")
+}
 
-	appservercsv, err := os.Open(*csv_file)
+// Processes the CSV and creates a base mapping of applications (aka components) and servers
+func getAppServerMapping(csv_file string) []AppServerMapping {
+
+	// Get size of file and application and server name column numbers for subsequent processing
+	var componentIdColumn, serverNameColumn int
+	_, componentIdColumn, serverNameColumn = getFileInfo(csv_file)
+	
+	// For storing the app to server mappings (and later the server actions)
+	var appServerMapping []AppServerMapping
+	var currentApp,blankApp AppServerMapping
+	//blankApp.appId = "nowayanythingisnamedthis"
+	currentApp = blankApp
+	
+	// For storing servers associated with a given app
+	// The actions part will be filled in later
+	var server ServerAction
+	
+	// Read through the file this time to build the application to server mapping
+	fileLine := 1
+	appservercsv, err := os.Open(csv_file)
 	if (err != nil) {
-		fmt.Println("*** Error opening file: "+ *csv_file)
+		fmt.Println("*** Error opening file: "+ csv_file)
 		os.Exit(5)
 	}
 
 	readfile := csv.NewReader(appservercsv)
-	
-	var [][]appServerRecords string // This holds all the records from the CSV file that contain app and servers
-	appServerRecords = getAppServerRecords(*csv_file)
-	var ci_index string // This holds 
-	var sn_index string
-	ci_index, sn_index, records := get
-	
-	var []appServers AppServer
-	currentAppServerIndex := 0  // index into appServers for given app
-	currentAppName := "nowayanythingisnamedthis"
-	currentServerName := "nowayanythingisnamedthiseither"
-	var []serverActions Action
-	var server string
-	
 	for {
 		record, err := readfile.Read()
 		if (err == io.EOF) {
 			break
 		}	
-		
+
 		if (err != nil) {
 			fmt.Println("*** Failed to read a record in CSV file.") 
-		}
-		
-		// Find the Server_Name and Component_id columns
-		var sn_index int
-		var ci_index int
-		// first time through
-		if ((sn_index == nil) || (ci_index == nil)) {
-			for index,content := range record {
-				if (content == "Server_Name") {
-					sn_index = index	
-				} else if (content == "Component_id") {
-					ci_index = index
-			} 
 		} else {
-			// process the record for the app and server name
-			record_app = record[ci_index]
-			record_server = record[sn_index]
-			if (currentAppName != record_app)	 {
-				// This is a new app than the last one. So start a new entry in the appServer array	
+			// Skip the first line which contains the column headings
+			if (fileLine > 1) {
+				// Check if we have come across a new application name
+				if (currentApp.appId != record[componentIdColumn]) {
+					// We've got a new app, so push the current on to the array if it's not the initial loop and start a new one
+					if (currentApp.appId != "") {
+						appServerMapping = append(appServerMapping, currentApp)
+					}
+					currentApp = blankApp
+					currentApp.appId = record[componentIdColumn]
+				} 
 
-			} else {
-				// Still processing servers for the same app. So append actions to the current appServer array entry
-				
-			}
-				
-			
-			
+				// store the server assocaited with the current app
+				server.serverName = record[serverNameColumn]
+				currentApp.serverActions = append(currentApp.serverActions, server)
+			}	
+			fileLine += 1
 		}
-		
-		if ()
-		
-			
-		
-		
-		
-		
-		
-		fmt.Println(record)
+	}	
+	
+	// Add the last serverActions block
+	appServerMapping = append(appServerMapping, currentApp)
+
+	return appServerMapping
+}
+
+// Adds the actions to the app-server mapping structure
+func addAppServerActions(appServerMapping []AppServerMapping, turbo_instance string, turbo_user string, turbo_password string) []AppServerMapping {
+	// Turbo authentication
+	auth := turboLogin(turbo_instance, turbo_user, turbo_password) 
+	
+	// Each item from appServerMapping is a structure containing the application ID and 
+	var serverUuid string
+	for _,app := range appServerMapping {
+		for srv_idx,server := range app.serverActions {
+			// Get the actions for the given server and add to the given server's actions struct
+			// If the server is not found, it'll be marked as NOTFOUND and we can catch that later if needed
+			serverUuid = getVmId(turbo_instance, server.serverName, auth ) 
+			app.serverActions[srv_idx].serverUuid = serverUuid
+			if (serverUuid != "NOTFOUND") {
+				app.serverActions[srv_idx].actions = getServerActions(turbo_instance, serverUuid, auth) 
+			}
+		}
 	}
+	return appServerMapping
+}
 
+func pushPowerBiData(appServerMapping []AppServerMapping, powerbi_url string) {
 
-	//server_name := "turbonomic-7.21.5-DS"
-	server_name := "MiniHost"
-	// Get VM UUID
-	server_uuid := getVmId(*turbo_instance, server_name, jsessionidCookie)
-	fmt.Println("vmId: "+server_uuid)
+	t := time.Now()
+	timeString := t.Format(time.RFC3339)
+  	method := "POST"
 	
-	// Get action info for VM
-	appServerActions := getServerActions(*turbo_instance, server_name, server_uuid, jsessionidCookie)
+	for _,app := range appServerMapping {
+		for _,server := range app.serverActions {
+			for _,action := range server.actions {
+				timestamp_part := "\"Timestamp\": \""+timeString+"\""
+				app_part := "\"Component_ID\": \""+app.appId+"\""
+				servername_part := "\"Server_Name\": \""+server.serverName+"\""
+				actiondetails_part := "\"Action_Details\": \""+action.actionDetails+"\""
+				actionfrom_part := "\"Action_From\": \""+action.actionFrom+"\""
+				actionto_part := "\"Action_To\": \""+action.actionTo+"\""
+				
+				payload := strings.NewReader("[{"+timestamp_part+","+app_part+","+servername_part+","+actiondetails_part+","+actionfrom_part+","+actionto_part+"}]")
+				
+				client := &http.Client {}
+  				req, err := http.NewRequest(method, powerbi_url, payload)
+  				if err != nil {
+    				fmt.Println(err)
+  				}
+  				req.Header.Add("Content-Type", "application/json")
 	
-	fmt.Println(appServerActions)
+  				res, _:= client.Do(req)
+  				defer res.Body.Close()
+  			}
+	  	}
+	}
+}
+
+// Does basic processing of the csv file
+func getFileInfo(csv_file string) (int, int, int) {
 	
-
-}	
-
-func getAppServerRecords(csv_file string) [][]string {
-
 	// Open the file
 	appservercsv, err := os.Open(csv_file)
 	if (err != nil) {
-		fmt.Println("*** Error opening file: "+ *csv_file)
+		fmt.Println("*** Error opening file: "+ csv_file)
 		os.Exit(5)
 	}
 	readfile := csv.NewReader(appservercsv)
+
+	// Run through the file and find the number of lines in the file and the columns that have the server name and app (i.e. component) id
+	numLines := 0
 	
-	var [][]appServerRecords string // This holds all the records from the CSV file that contain app and servers
-	appServerRecords = getAppServerRecords(*csv_file)
-	var ci_index string // This holds 
-	var sn_index string
-	ci_index, sn_index, records := get
-	
-	var []appServers AppServer
-	currentAppServerIndex := 0  // index into appServers for given app
-	currentAppName := "nowayanythingisnamedthis"
-	currentServerName := "nowayanythingisnamedthiseither"
-	var []serverActions Action
-	var server string
-	
+	componentIdColName := "Component_Id"
+	componentIdColumn := -1 
+	serverNameColName := "Server_Name"
+	serverNameColumn := -1
+	columnNameLine := -1
 	for {
 		record, err := readfile.Read()
 		if (err == io.EOF) {
 			break
 		}	
-		
+
 		if (err != nil) {
 			fmt.Println("*** Failed to read a record in CSV file.") 
-		}
-		
-		// Find the Server_Name and Component_id columns
-		var sn_index int
-		var ci_index int
-		// first time through
-		if ((sn_index == nil) || (ci_index == nil)) {
-			for index,content := range record {
-				if (content == "Server_Name") {
-					sn_index = index	
-				} else if (content == "Component_id") {
-					ci_index = index
-			} 
 		} else {
-			// process the record for the app and server name
-			record_app = record[ci_index]
-			record_server = record[sn_index]
-			if (currentAppName != record_app)	 {
-				// This is a new app than the last one. So start a new entry in the appServer array	
+			numLines += 1
 
-			} else {
-				// Still processing servers for the same app. So append actions to the current appServer array entry
-				
+			for index,content := range record {
+				if (content == componentIdColName) {
+					componentIdColumn = index
+					columnNameLine = numLines
+				}  else if (content == serverNameColName) {
+					serverNameColumn = index	
+					columnNameLine = numLines
+				}
 			}
-				
-			
-			
 		}
-		
-		if ()
-		
-				
+	}
+
+	if (columnNameLine != 1) {
+		// The CSV file needs to have the column headers at the top otherwise
+		fmt.Println("*** CSV file MUST have the column names on the first line of the file. ***")
+		os.Exit(10)
+	}	
 	
+	if (componentIdColumn < 0) {
+		fmt.Println("*** No \""+componentIdColName+"\" column found.")
+		fmt.Println("*** Either the column heading is not there, or there's some weird ufeff character in that row.")
+		os.Exit(11)
+	}
+
+	if (serverNameColumn < 0) {
+		fmt.Println("*** No \""+serverNameColName+"\" column found.")
+		fmt.Println("*** Either the column heading is not there, or there's some weird ufeff character in that row.")
+		os.Exit(11)
+	}
 	
+	return numLines, componentIdColumn, serverNameColumn
 }
 
-
 // Get actions for given server UUID
-func getServerActions (turbo_instance string, server_name string, server_id string,  auth string) []Action {
-
+func getServerActions (turbo_instance string, server_id string,  auth string) []Action {
 	url := "https://"+ turbo_instance +"/vmturbo/rest/entities/"+ server_id +"/actions" 
 	method := "GET"
 	
@@ -267,7 +329,6 @@ func getServerActions (turbo_instance string, server_name string, server_id stri
 	for _, responseAction := range responseActions {
 		var serverAction Action
 		serverAction.actionUuid = responseAction["uuid"].(string)
-		serverAction.actionTarget = responseAction["target"].(map[string]interface{})["displayName"].(string)
 		serverAction.actionDetails = responseAction["details"].(string)
 		if  (responseAction["target"].(map[string]interface{})["environmentType"] == "CLOUD") {
 			serverAction.actionFrom = responseAction["currentEntity"].(map[string]interface{})["displayName"].(string)
@@ -281,48 +342,6 @@ func getServerActions (turbo_instance string, server_name string, server_id stri
 	
 	return serverActions
 }	
-	
-	
-	/*
-function GetServerActions($serverName, $serverUuid, $turboInstance, $authorization) {
-	Write-Debug -Message "In getActions"
-	
-	$entityActions = @()
-	$uri = "https://{0}/vmturbo/rest/entities/{1}/actions" -f $turboInstance, $serverUuid
-	#$uri = "https://{0}/api/v3/entities/{1}/actions?order_by=severity&ascending=true" -f $turboInstance, $serverUuid
-	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    try {
-    	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-		$headers.Add("Cookie", $authorization)
-		$resp = Invoke-RestMethod $uri -Method 'GET' -Headers $headers 
-
-		$resp | ForEach-Object {
-			$actionObject = $_ 
-			if ($actionObject.target.environmentType -eq "CLOUD") {
-				$actionFrom = $actionObject.currentEntity.displayName
-				$actionTo = $actionObject.newEntity.displayName
-			} else {
-				$actionFrom = "NA"
-				$actionTo = "NA"
-			}
-			$action_hash = @{
-				"action_target" = $serverName;
-				"action_uuid" = $actionObject.uuid;
-				"action_details" = $actionObject.details; 
-				"action_from" = $actionFrom;
-				"action_to" = $actionTo;
-			}
-			$entityActions += $action_hash
-		}
-	} catch {
-		Write-Host "Turbonomic API: Error getting actions for UUID, $uuid"
-		Write-Host "StatusCode:" $_.Exception.Response.StatusCode.value__ 
-    	Write-Host "StatusDescription:" $_.Exception.Response.ReasonPhrase
-	}
-	
-	$entityActions
-}
-*/
 
 // get VM UUID
 func getVmId(turbo_instance string, server_name string, auth string) string {
@@ -330,7 +349,7 @@ func getVmId(turbo_instance string, server_name string, auth string) string {
 	url := "https://"+ turbo_instance +"/api/v3/search?q="
 	method := "POST"
 	
-	// test payload for now
+	// VM search payload
 	vm_payload := strings.NewReader("{\n  \"className\": \"VirtualMachine\",\n  \"criteriaList\": [\n    {\n      \"expVal\": \"^"+server_name+"$\",\n      \"caseSensitive\": \"\",\n      \"filterType\": \"vmsByName\",\n      \"expType\": \"RXEQ\"\n    }\n  ],\n  \"logicalOperator\": \"AND\"\n}")
 	
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
@@ -366,9 +385,13 @@ func getVmId(turbo_instance string, server_name string, auth string) string {
 	// now searchResults is an array of structures that we can index.
 	// There's only one result so we're hardcoding the array index and we only care about the uuid
 	//fmt.Println("searchResults")
-	//fmt.Println(searchResults[0]["uuid"])
+	//fmt.Println(searchResults)
 	
-	return searchResults[0]["uuid"].(string)
+	if (len(searchResults) > 0) {
+		return searchResults[0]["uuid"].(string)
+	} else {
+		return "NOTFOUND"
+	}
 }	
 
 // Login to turbo
@@ -414,4 +437,3 @@ func turboLogin(turbo_instance string, turbo_user string, turbo_password string)
   	
 	return jsessionid_cookie
 }
-
