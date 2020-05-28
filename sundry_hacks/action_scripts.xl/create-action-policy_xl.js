@@ -92,11 +92,11 @@ async function buildSettingsManagerSettings() {
 		
 		/* The cm_id should match the name given in the comments above. */
 		switch (workflow.displayName) {
-			case "prep_resize_vm":
+			case "pre_resize_vm":
 				cm_id = "preResizeActionWorkflow"
 				as_id = workflow.uuid
 				break;
-			case "prep_move_vm":
+			case "pre_move_vm":
 				cm_id = "preMoveActionWorkflow"
 				as_id = workflow.uuid
 				break;
@@ -153,6 +153,7 @@ async function getUuid(entity_type, entity_name) {
 				"className": className,
 				"scope": null
 	}
+	
 	response = await fetch('/vmturbo/rest/search', {
 		method: 'POST',
 		body: JSON.stringify(search_body),
@@ -161,6 +162,7 @@ async function getUuid(entity_type, entity_name) {
 	      }
 	})
 	info =  await response.json()
+	
 	if (info.length > 0) {
 		/* Found an existing entity so return uuid */
 		return info[0].uuid
