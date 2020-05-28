@@ -33,20 +33,20 @@
 		"actionPhase": "POST"
 	},
 	{
-		"name": "prep_resize_vm",
+		"name": "pre_resize_vm",
  		"description": "Runs BEFORE Turbonomic resize orchestration",
 		"scriptPath": "./pre_resize_vm.sh",
 		"entityType": "VIRTUAL_MACHINE",
 		"actionType": "RIGHT_SIZE",
-		"actionPhase": "PREP"
+		"actionPhase": "PRE"
 	},
 	{
-		"name": "prep_move_vm",
+		"name": "pre_move_vm",
  		"description": "Runs BEFORE Turbonomic move orchestration",
-		"scriptPath": "./post_move_vm.sh",
+		"scriptPath": "./pre_move_vm.sh",
 		"entityType": "VIRTUAL_MACHINE",
 		"actionType": "MOVE",
-		"actionPhase": "PREP"
+		"actionPhase": "PRE"
 	}
  ]
 } 
