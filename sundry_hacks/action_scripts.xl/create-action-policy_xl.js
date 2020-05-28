@@ -92,6 +92,14 @@ async function buildSettingsManagerSettings() {
 		
 		/* The cm_id should match the name given in the comments above. */
 		switch (workflow.displayName) {
+			case "prep_resize_vm":
+				cm_id = "preResizeActionWorkflow"
+				as_id = workflow.uuid
+				break;
+			case "prep_move_vm":
+				cm_id = "preMoveActionWorkflow"
+				as_id = workflow.uuid
+				break;
 			case "replace_resize_vm":
 				cm_id = "resizeActionWorkflow"
 				as_id = workflow.uuid

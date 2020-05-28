@@ -2,7 +2,7 @@
  "scripts": [
  	{
  		"name": "replace_resize_vm",
- 		"description": "script simply outputs date in file local to script",
+ 		"description": "REPLACES Turbonomic resize orchestration",
  		"scriptPath": "./replace_resize_vm.sh",
  		"entityType": "VIRTUAL_MACHINE",
  		"actionType": "RIGHT_SIZE",
@@ -10,7 +10,7 @@
  	},
  	{
  		"name": "replace_move_vm",
- 		"description": "script simply outputs date in file local to script",
+ 		"description": "REPLACES Turbonomic move orchestration",
  		"scriptPath": "./replace_move_vm.sh",
  		"entityType": "VIRTUAL_MACHINE",
  		"actionType": "MOVE",
@@ -18,7 +18,7 @@
  	},
 	{
 		"name": "post_resize_vm",
-		"description": "script simply outputs date in file local to script",
+ 		"description": "Runs AFTER Turbonomic resize orchestration",
 		"scriptPath": "./post_resize_vm.sh",
 		"entityType": "VIRTUAL_MACHINE",
 		"actionType": "RIGHT_SIZE",
@@ -26,11 +26,27 @@
 	},
 	{
 		"name": "post_move_vm",
-		"description": "script simply outputs date in file local to script",
+ 		"description": "Runs AFTER Turbonomic move orchestration",
 		"scriptPath": "./post_move_vm.sh",
 		"entityType": "VIRTUAL_MACHINE",
 		"actionType": "MOVE",
 		"actionPhase": "POST"
+	},
+	{
+		"name": "prep_resize_vm",
+ 		"description": "Runs BEFORE Turbonomic resize orchestration",
+		"scriptPath": "./pre_resize_vm.sh",
+		"entityType": "VIRTUAL_MACHINE",
+		"actionType": "RIGHT_SIZE",
+		"actionPhase": "PREP"
+	},
+	{
+		"name": "prep_move_vm",
+ 		"description": "Runs BEFORE Turbonomic move orchestration",
+		"scriptPath": "./post_move_vm.sh",
+		"entityType": "VIRTUAL_MACHINE",
+		"actionType": "MOVE",
+		"actionPhase": "PREP"
 	}
  ]
 } 
