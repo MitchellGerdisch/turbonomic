@@ -8,8 +8,10 @@ Pushes records to Power BI streaming dataset that provide application-server-act
 Requires a Power BI streaming dataset defined with the following fields:
 - Timestamp (DateTime)
 - Component_ID (Text)
+- Component_Name (Text)
 - Server_Name (Text)
 - Action_Details (Text)
+- Action_Type (Text)
 - Action_From (Text)
 - Action_To (Text)
 
@@ -47,6 +49,7 @@ import (
  	"mime/multipart"
 	"encoding/json"
 	"strings"
+	"strconv"
     "fmt"
     "io/ioutil"
     "net/http"
@@ -62,6 +65,7 @@ import (
 type Action struct {
 	actionUuid string
 	actionDetails string
+	actionType string
 	actionFrom string
 	actionTo string
 }
@@ -74,6 +78,7 @@ type ServerAction struct {
 
 type AppServerMapping struct {
 	appId string
+	appName string
 	serverActions []ServerAction
 }
 
@@ -117,8 +122,8 @@ func main() {
 func getAppServerMapping(csv_file string) []AppServerMapping {
 
 	// Get size of file and application and server name column numbers for subsequent processing
-	var componentIdColumn, serverNameColumn int
-	_, componentIdColumn, serverNameColumn = getFileInfo(csv_file)
+	var componentIdColumn, componentNameColumn, serverNameColumn int
+	_, componentIdColumn, componentNameColumn, serverNameColumn = getFileInfo(csv_file)
 	
 	// For storing the app to server mappings (and later the server actions)
 	var appServerMapping []AppServerMapping
@@ -158,9 +163,10 @@ func getAppServerMapping(csv_file string) []AppServerMapping {
 					}
 					currentApp = blankApp
 					currentApp.appId = record[componentIdColumn]
+					currentApp.appName = record[componentNameColumn]
 				} 
 
-				// store the server assocaited with the current app
+				// store the server associated with the current app
 				server.serverName = record[serverNameColumn]
 				currentApp.serverActions = append(currentApp.serverActions, server)
 			}	
@@ -182,6 +188,7 @@ func addAppServerActions(appServerMapping []AppServerMapping, turbo_instance str
 	// Each item from appServerMapping is a structure containing the application ID and 
 	var serverUuid string
 	for _,app := range appServerMapping {
+		fmt.Println("Getting actions for servers in Application: "+app.appName)
 		for srv_idx,server := range app.serverActions {
 			// Get the actions for the given server and add to the given server's actions struct
 			// If the server is not found, it'll be marked as NOTFOUND and we can catch that later if needed
@@ -205,13 +212,15 @@ func pushPowerBiData(appServerMapping []AppServerMapping, powerbi_url string) {
 		for _,server := range app.serverActions {
 			for _,action := range server.actions {
 				timestamp_part := "\"Timestamp\": \""+timeString+"\""
-				app_part := "\"Component_ID\": \""+app.appId+"\""
+				appid_part := "\"Component_ID\": \""+app.appId+"\""
+				appname_part := "\"Component_Name\": \""+app.appName+"\""
 				servername_part := "\"Server_Name\": \""+server.serverName+"\""
 				actiondetails_part := "\"Action_Details\": \""+action.actionDetails+"\""
+				actiontype_part := "\"Action_Type\": \""+action.actionType+"\""
 				actionfrom_part := "\"Action_From\": \""+action.actionFrom+"\""
 				actionto_part := "\"Action_To\": \""+action.actionTo+"\""
 				
-				payload := strings.NewReader("[{"+timestamp_part+","+app_part+","+servername_part+","+actiondetails_part+","+actionfrom_part+","+actionto_part+"}]")
+				payload := strings.NewReader("[{"+timestamp_part+","+appid_part+","+appname_part+","+servername_part+","+actiondetails_part+","+actiontype_part+","+actionfrom_part+","+actionto_part+"}]")
 				
 				client := &http.Client {}
   				req, err := http.NewRequest(method, powerbi_url, payload)
@@ -228,7 +237,7 @@ func pushPowerBiData(appServerMapping []AppServerMapping, powerbi_url string) {
 }
 
 // Does basic processing of the csv file
-func getFileInfo(csv_file string) (int, int, int) {
+func getFileInfo(csv_file string) (int, int, int, int) {
 	
 	// Open the file
 	appservercsv, err := os.Open(csv_file)
@@ -241,8 +250,10 @@ func getFileInfo(csv_file string) (int, int, int) {
 	// Run through the file and find the number of lines in the file and the columns that have the server name and app (i.e. component) id
 	numLines := 0
 	
-	componentIdColName := "Component_Id"
+	componentIdColName := "Component_id"
 	componentIdColumn := -1 
+	componentNameColName := "Component_Name"
+	componentNameColumn := -1 
 	serverNameColName := "Server_Name"
 	serverNameColumn := -1
 	columnNameLine := -1
@@ -264,6 +275,9 @@ func getFileInfo(csv_file string) (int, int, int) {
 				}  else if (content == serverNameColName) {
 					serverNameColumn = index	
 					columnNameLine = numLines
+				}	else if (content == componentNameColName) {
+					componentNameColumn = index	
+					columnNameLine = numLines
 				}
 			}
 		}
@@ -280,6 +294,12 @@ func getFileInfo(csv_file string) (int, int, int) {
 		fmt.Println("*** Either the column heading is not there, or there's some weird ufeff character in that row.")
 		os.Exit(11)
 	}
+	
+	if (componentNameColumn < 0) {
+		fmt.Println("*** No \""+componentNameColName+"\" column found.")
+		fmt.Println("*** Either the column heading is not there, or there's some weird ufeff character in that row.")
+		os.Exit(11)
+	}
 
 	if (serverNameColumn < 0) {
 		fmt.Println("*** No \""+serverNameColName+"\" column found.")
@@ -287,7 +307,7 @@ func getFileInfo(csv_file string) (int, int, int) {
 		os.Exit(11)
 	}
 	
-	return numLines, componentIdColumn, serverNameColumn
+	return numLines, componentIdColumn, componentNameColumn, serverNameColumn
 }
 
 // Get actions for given server UUID
@@ -326,16 +346,40 @@ func getServerActions (turbo_instance string, server_id string,  auth string) []
 	}
 
 	var serverActions []Action
+	var riskcommodity string
+	var fromval, toval float64
 	for _, responseAction := range responseActions {
 		var serverAction Action
 		serverAction.actionUuid = responseAction["uuid"].(string)
+		serverAction.actionType = responseAction["actionType"].(string)
 		serverAction.actionDetails = responseAction["details"].(string)
 		if  (responseAction["target"].(map[string]interface{})["environmentType"] == "CLOUD") {
 			serverAction.actionFrom = responseAction["currentEntity"].(map[string]interface{})["displayName"].(string)
 			serverAction.actionTo = responseAction["newEntity"].(map[string]interface{})["displayName"].(string)
 		} else {
-			serverAction.actionFrom = "NA"
-			serverAction.actionTo = "NA"
+			riskcommodity = responseAction["risk"].(map[string]interface{})["reasonCommodity"].(string)
+			if (riskcommodity == "VCPU") {
+				// Get CPU values (in float)
+				fromval, _ = strconv.ParseFloat(responseAction["currentValue"].(string), 32)
+				toval, _ = strconv.ParseFloat(responseAction["resizeToValue"].(string), 32)
+				// Convert from float to int
+				serverAction.actionFrom = strconv.Itoa(int(fromval))
+				serverAction.actionTo = strconv.Itoa(int(toval))
+			} else if (riskcommodity == "VMem") {
+				fromval, _ = strconv.ParseFloat(responseAction["currentValue"].(string), 32)
+				// Convert to GB
+				fromval = (fromval/(1024*1024))
+				toval, _ = strconv.ParseFloat(responseAction["resizeToValue"].(string), 32)
+				// Convert to GB
+				toval = (toval/(1024*1024))
+				// Convert from float to int
+				serverAction.actionFrom = strconv.Itoa(int(fromval))
+				serverAction.actionTo = strconv.Itoa(int(toval))
+			} else {
+				serverAction.actionFrom = "NA"
+				serverAction.actionTo = "NA"
+			}
+
 		}
 		serverActions = append(serverActions, serverAction)
 	}
