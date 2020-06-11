@@ -14,6 +14,8 @@ Requires a Power BI streaming dataset defined with the following fields:
 - Action_Type (Text)
 - Action_From (Text)
 - Action_To (Text)
+- Reason (Text)
+- Severity (Text)
 
 .EXAMPLE
 PushTurboActions_PowerBI.ps1 -TurboInstance turbonomic.mycompany.com -TurboCredential $TurboCred -PowerBiCredential $PowerBiKey -AppServerMapCsv appserver.csv
@@ -68,6 +70,8 @@ type Action struct {
 	actionType string
 	actionFrom string
 	actionTo string
+	reason string
+	severity string
 }
 
 type ServerAction struct {
@@ -219,8 +223,10 @@ func pushPowerBiData(appServerMapping []AppServerMapping, powerbi_url string) {
 				actiontype_part := "\"Action_Type\": \""+action.actionType+"\""
 				actionfrom_part := "\"Action_From\": \""+action.actionFrom+"\""
 				actionto_part := "\"Action_To\": \""+action.actionTo+"\""
+				reason_part := "\"Reason\": \""+action.reason+"\""
+				severity_part := "\"Severity\": \""+action.severity+"\""
 				
-				payload := strings.NewReader("[{"+timestamp_part+","+appid_part+","+appname_part+","+servername_part+","+actiondetails_part+","+actiontype_part+","+actionfrom_part+","+actionto_part+"}]")
+				payload := strings.NewReader("[{"+timestamp_part+","+appid_part+","+appname_part+","+servername_part+","+actiondetails_part+","+actiontype_part+","+actionfrom_part+","+actionto_part+","+reason_part+","+severity_part+"}]")
 				
 				client := &http.Client {}
   				req, err := http.NewRequest(method, powerbi_url, payload)
@@ -312,15 +318,18 @@ func getFileInfo(csv_file string) (int, int, int, int) {
 
 // Get actions for given server UUID
 func getServerActions (turbo_instance string, server_id string,  auth string) []Action {
+
 	url := "https://"+ turbo_instance +"/vmturbo/rest/entities/"+ server_id +"/actions" 
-	method := "GET"
+	method := "POST"
+	// We only care about resize actions
+	payload := strings.NewReader("{\"actionTypeList\":[\"RESIZE\",\"RIGHT_SIZE\",\"SCALE\"],\"environmentType\":\"HYBRID\",\"detailLevel\":\"EXECUTION\"}")
 	
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	client := &http.Client{Transport: customTransport}	
-
+	
 	// create and make the request
-	req, err := http.NewRequest(method, url, nil)
+	req, err := http.NewRequest(method, url, payload)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -352,6 +361,8 @@ func getServerActions (turbo_instance string, server_id string,  auth string) []
 		var serverAction Action
 		serverAction.actionUuid = responseAction["uuid"].(string)
 		serverAction.actionType = responseAction["actionType"].(string)
+		serverAction.reason = responseAction["risk"].(map[string]interface{})["description"].(string)
+		serverAction.severity = responseAction["risk"].(map[string]interface{})["severity"].(string)
 		serverAction.actionDetails = responseAction["details"].(string)
 		if  (responseAction["target"].(map[string]interface{})["environmentType"] == "CLOUD") {
 			serverAction.actionFrom = responseAction["currentEntity"].(map[string]interface{})["displayName"].(string)
