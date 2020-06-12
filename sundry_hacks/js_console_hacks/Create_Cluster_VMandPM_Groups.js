@@ -58,6 +58,8 @@ async function CreateUpdate_Group(cluster_name, group_name, filter_type, group_t
 		group_url = group_url+"/"+group_uuid
 		api_method = 'PUT'
 	}
+	
+	cluster_name = regExpEscape(cluster_name)
 
 	/* Create a dynamic group based on the cluster name */
 	var group_body = {
@@ -108,6 +110,8 @@ async function getUuid(entity_type, entity_name) {
 		return 0
 	}
 
+	entity_name = regExpEscape(entity_name)
+
 	search_body = {
 			"criteriaList": [
 				{
@@ -133,5 +137,9 @@ async function getUuid(entity_type, entity_name) {
 		/* Found an existing entity so return uuid */
 		return info[0].uuid
 	}
+}
+
+function regExpEscape(literal_string) {
+    return literal_string.replace(/[-[\]{}()*+!<=:?.\/\\^$|#\s,]/g, '\\$&');
 }
 

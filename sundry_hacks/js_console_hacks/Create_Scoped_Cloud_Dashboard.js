@@ -261,6 +261,8 @@ async function getUuid(entity_type, entity_name) {
 		return 0
 	}
 
+	entity_name = regExpEscape(entity_name)
+
 	search_body = {
 			"criteriaList": [
 				{
@@ -290,5 +292,9 @@ async function getUuid(entity_type, entity_name) {
 			"name":info[0].displayName
 		}
 	}
+}
+
+function regExpEscape(literal_string) {
+    return literal_string.replace(/[-[\]{}()*+!<=:?.\/\\^$|#\s,]/g, '\\$&');
 }
 

@@ -89,6 +89,8 @@ async function getUuid(entity_type, entity_name) {
 		return 0
 	}
 
+	entity_name = regExpEscape(entity_name)
+
 	search_body = {
 			"criteriaList": [
 				{
@@ -114,4 +116,8 @@ async function getUuid(entity_type, entity_name) {
 		/* Found an existing entity so return uuid */
 		return info[0].uuid
 	}
+}
+
+function regExpEscape(literal_string) {
+    return literal_string.replace(/[-[\]{}()*+!<=:?.\/\\^$|#\s,]/g, '\\$&');
 }

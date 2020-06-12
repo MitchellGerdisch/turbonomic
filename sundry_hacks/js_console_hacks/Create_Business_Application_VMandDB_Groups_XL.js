@@ -158,7 +158,7 @@ async function getBusAppElements(element_type, uuid) {
 	/* Check if we got anything back. */
 	.then(function(response) {
 			if (!response.ok) {
-				console.log("(Ignore 400 error.)")
+				console.log("(Don't fret. You can ignore the 400 error.)")
 				throw Error("no elements found")
 			}
 			return response /* if the throw doesn't fire, forward the response to the success case processing */
@@ -201,6 +201,8 @@ async function getUuid(entity_type, entity_name) {
 		console.log("getUuid: Called with incorrect entity_type")
 		return 0
 	}
+	
+	entity_name = regExpEscape(entity_name)
 
 	search_body = {
 			"criteriaList": [
@@ -229,3 +231,6 @@ async function getUuid(entity_type, entity_name) {
 	}
 }
 
+function regExpEscape(literal_string) {
+    return literal_string.replace(/[-[\]{}()*+!<=:?.\/\\^$|#\s,]/g, '\\$&');
+}
