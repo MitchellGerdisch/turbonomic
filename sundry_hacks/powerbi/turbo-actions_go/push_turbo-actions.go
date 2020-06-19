@@ -87,6 +87,10 @@ type AppServerMapping struct {
 }
 
 func main() {
+
+	version := "1.2"
+	fmt.Println("push_turbo-actions version "+version)
+
 	// Process command line arguments
 	turbo_user := flag.String("turbo_user", "", "Turbo Username")
 	turbo_password:= flag.String("turbo_password", "", "Turbo Password")
@@ -101,6 +105,21 @@ func main() {
 		fmt.Println("Missing command line argument ...")
 		fmt.Println("Run \""+os.Args[0]+" -h\" for more information.")
 		fmt.Println("*************")
+		
+		fmt.Println("\n")
+		fmt.Println("The PowerBI Streaming Dataset you are using must have the following fields set up with the types given in parentheses:")
+		fmt.Println()
+		fmt.Println("- Timestamp (DateTime)")
+		fmt.Println("- Component_ID (Text)")
+		fmt.Println("- Component_Name (Text)")
+		fmt.Println("- Server_Name (Text)")
+		fmt.Println("- Action_Details (Text)")
+		fmt.Println("- Action_Type (Text)")
+		fmt.Println("- Action_From (Text)")
+		fmt.Println("- Action_To (Text)")
+		fmt.Println("- Reason (Text)")
+		fmt.Println("- Severity (Text)")
+
 		os.Exit(1)
 	}
 	// end command line arguments
@@ -256,7 +275,7 @@ func getFileInfo(csv_file string) (int, int, int, int) {
 	// Run through the file and find the number of lines in the file and the columns that have the server name and app (i.e. component) id
 	numLines := 0
 	
-	componentIdColName := "Component_id"
+	componentIdColName := "Component_Id"
 	componentIdColumn := -1 
 	componentNameColName := "Component_Name"
 	componentNameColumn := -1 
