@@ -8,12 +8,6 @@
 CreateMemMetricsGroups()
 
 
-PROCESSING NOTES:
-	Search for all accounts
-	Do the stats call API (see below) scoped for each? all? account UUIDs
-			with cursor logic
-	Run through the instances and their mem metrics and separate out those with >0 as mem metrics enabled
-
 async function CreateMemMetricsGroups() { 
 	
 	console.log("")
@@ -26,50 +20,107 @@ async function CreateMemMetricsGroups() {
 	console.log("... found "+cloud_account_ids.length+" cloud accounts ...")
 	console.log("... processing VMs' memory metrics ...") 
 		
-	instance_mem_metrics = await getInstanceMemMetrics(cloud_account_ids)
-
-	if (instance_mem_metrics.length == 0) {
-		console.log("*** Something is not working. No memory metrics data was found for any instances.")
+	instance_mem_stats = await getInstanceMemStats(cloud_account_ids)
+	
+	if (instance_mem_stats.length == 0) {
+		console.log("*** Something is not working. The API did not return any data.")
 		return
 	}
 	
-	console.log(JSON.stringify(instance_mem_metrics))
-		
-		
-		/*
-		csvContentMemMetricsEnabled = "data:text/csv;charset=utf-8,";
-		csvContentMemMetricsEnabled += "Instance Name,Instance ID,Mem Utilization
-		csvContentMemMetricsDisabled = "data:text/csv;charset=utf-8,";
-		csvContentMemMetricsDisabled += "Instance Name,Instance ID,Mem Utilization
-		
-		for (m = 0; m < instance_mem_metrics.length; m++) {
-			cloud_instance = instance_mem_metrics[i]
-			name = cloud_instance.name
-			id = cloud_instance.id
-			memutil = cloud_instance.memutil
-			
-			if (memutil > 0) {
-				csvContentMemMetricsEnabled += name + "," + id + "," + memutil + "\n"
-				***** DO GROUP STUFF TOO
+	/* 
+	 * Build array of all idle instance uuids to check against while building the groups.
+	 * This is needed because idle instances will have mem stat of 0 - it's idle after all.
+	 * So we don't want to put idle instances in either group since we don't know. 
+	 */
+	idle_instances = await getIdleCloudInstances(cloud_account_ids)
+	
+	/*
+	 * Now go through the stats and separate the instances with memory metrics enabled - as identified by a non-zero memory stat,
+	 * from those without memory metrics enabled.
+	 * Idle instances are unknown.
+	 */
+	csvContentMemMetricsUnknown = "data:text/csv;charset=utf-8,";
+	csvContentMemMetricsUnknown += "Instance Name,Instance ID\n"
+	csvContentMemMetricsEnabled = "data:text/csv;charset=utf-8,";
+	csvContentMemMetricsEnabled += "Instance Name,Instance ID\n"
+	csvContentMemMetricsDisabled = "data:text/csv;charset=utf-8,";
+	csvContentMemMetricsDisabled += "Instance Name,Instance ID\n"
+	mem_metric_unknown = []	
+	mem_metric_enabled = []
+	mem_metric_disabled = []
+	for (m = 0; m < instance_mem_stats.length; m++) {
+		instance_mem_stat = instance_mem_stats[m]
+		uuid = instance_mem_stat.uuid
+		name = instance_mem_stat.displayName
+		if (idle_instances.includes(uuid)) {
+			csvContentMemMetricsUnknown += name + "," + uuid + "\n"
+			mem_metric_unknown.push(uuid)
+		} else {
+			instance_mem_util = getInstanceMemUtil(instance_mem_stat)
+			if (instance_mem_util > 0) {
+				csvContentMemMetricsEnabled += name + "," + uuid + "\n"
+				mem_metric_enabled.push(uuid)
 			} else {
-				csvContentMemMetricsDisabled += name + "," + id + "," + memutil + "\n"
-				***** DO GROUP STUFF TOO
+				csvContentMemMetricsDisabled += name + "," + uuid + "\n"
+				mem_metric_disabled.push(uuid)
 			}
 		}
-
-		console.log("*** Downloading CSVs containing instances with and without memory metrics.")
-		link = document.createElement('a')
-		link.setAttribute('href', encodeURI(csvContentMemMetricsEnabled));
-		link.setAttribute('download', `turbonomic_MemMetricsEnabled_${(new Date()).getTime()}.csv`);
-		link.click()
-		link = document.createElement('a')
-		link.setAttribute('href', encodeURI(csvContentMemMetricsDisabled));
-		link.setAttribute('download', `turbonomic_MemMetricsDisabled_${(new Date()).getTime()}.csv`);
-		link.click()
 	}
-		*/
-}
+
+	/* Create/update groups */
+	await upsertStaticGroup("VMs_Memory_Metrics_Unknown", mem_metric_unknown)
+	await upsertStaticGroup("VMs_Memory_Metrics_Enabled", mem_metric_enabled)
+	await upsertStaticGroup("VMs_Memory_Metrics_Disabled", mem_metric_disabled)
+
 	
+	/* Create and download CSVs of the VMs in each group */
+	console.log("*** Downloading CSVs containing instances with and without memory metrics as well as unknown (i.e. idle).")
+	link = document.createElement('a')
+	link.setAttribute('href', encodeURI(csvContentMemMetricsUnknown));
+	link.setAttribute('download', `turbonomic_MemMetricsUnknown_${(new Date()).getTime()}.csv`);
+	link.click()
+	link = document.createElement('a')
+	link.setAttribute('href', encodeURI(csvContentMemMetricsEnabled));
+	link.setAttribute('download', `turbonomic_MemMetricsEnabled_${(new Date()).getTime()}.csv`);
+	link.click()
+	link = document.createElement('a')
+	link.setAttribute('href', encodeURI(csvContentMemMetricsDisabled));
+	link.setAttribute('download', `turbonomic_MemMetricsDisabled_${(new Date()).getTime()}.csv`);
+	link.click()
+}
+
+/* Returns an array of VMem stats for all the cloud instances */
+async function getInstanceMemStats(cloudAccountIds) {
+	
+	base_uri = "/api/v3/stats"
+	body = {
+			"scopes":cloudAccountIds,
+			"period":{
+				"statistics":[
+					{"name":"VMem"}
+				]
+			},
+			"relatedType":"VirtualMachine"
+	}
+	
+	all_stats = await getAllResponses(base_uri, body, "POST")
+	
+	return all_stats
+}
+
+function getInstanceMemUtil(item) {
+	
+	stats = item.stats[0].statistics
+	
+	for (s = 0; s < stats.length; s++) {
+		stat = stats[s]
+		if (stat.name == "VMem") {
+			return stat.values.avg
+		}
+	}
+}
+
+
 /*
  * Returns an array of all the UUIDs of the given type.
  * You can see the type by going to Search in the UI and selecting a given category.
@@ -84,118 +135,152 @@ async function getUuids(type) {
 	      	}
 		})
 	
-	items = await response.json()
+	type_search_results = await getAllResponses(uri, {}, "GET")
 	
-	if (items.length == 0) {
+	if (type_search_results.length == 0) {
 		console.log("No items of type, "+type+" found. Exiting.")
 		return
 	}
-	console.log("Found "+items.length+" items of type, "+type+".")
-	item_ids = items.map(item => item.uuid)
+	console.log("Found "+type_search_results.length+" items of type, "+type+".")
+	item_ids = type_search_results.map(type_search_result => type_search_result.uuid)
 
 	return(item_ids)
 }
 
-
-async function getInstanceMemMetrics(cloudAccountIds) {
+async function getIdleCloudInstances(account_list) {
+	accounts_regexp = account_list[0]
+	for (a = 1; a < account_list.length; a++) {
+		accounts_regexp = accounts_regexp + "|"+account_list[a]
+	}
 	
-	/*base_uri = "/vmturbo/rest/stats?ascending=true&cursor="
-	 * 
-	 */
-	base_uri = "/api/v3/stats?ascending=true&cursor="
+	base_uri = "/vmturbo/rest/search/?ascending=false&aspect_names=cloudAspect&disable_hateoas=true&order_by=severity&q="
 	body = {
-			"scopes":cloudAccountIds,
-			"period":{
-				"statistics":[
-					{"name":"VMem"}
-				]
-			},
-			"relatedType":"VirtualMachine"
-	}
-	
-	console.log("*** DEBUG *** "+JSON.stringify(body))
-	
-	/* API defaults to 500 max elements - so use cursor attribute, if needed, to call API multiple times to get all the instances. */
-	all_instances = []
-	cursor = 0
-	looking_for_instances = true
-	stop = 0
-	while (looking_for_instances) {
-		uri = base_uri + cursor
-		console.log("DEBUG URI: "+uri)
-		instance_stats_response = await fetch(uri, {
-			method: 'POST',
-			body: JSON.stringify(body),
-	    	headers: {
-	        	'Content-Type': 'application/json'
-	      	}
-		})
-		instance_stats = await instance_stats_response.json()	
-		
-		
-		if (instance_stats.length > 0) {
-			console.log("DEBUG Found instance_stats")
-			console.log("DEBUG cursor before: "+cursor)
-			console.log("DEBIG length: "+instance_stats.length)
-			cursor = cursor + instance_stats.length 
-			console.log("DEBUG cursor after: "+cursor)
-			all_instances = all_instances.concat(instance_stats)
-		} else {
-			console.log("DEBUG done finding instance_stats")
-			looking_for_instances = false
+		  "criteriaList": [
+		    {
+		      "expType": "EQ",
+		      "expVal": "IDLE",
+		      "filterType": "vmsByState",
+		      "caseSensitive": false
+		    },
+		    {
+		        "expType": "EQ",
+		        "expVal": accounts_regexp,
+		        "filterType": "vmsByBusinessAccountUuid",
+		        "caseSensitive": false
+		      }
+		  ],
+		  "logicalOperator": "AND",
+		  "className": "VirtualMachine",
+		  "scope": null
 		}
-
-		/* DEBUG */
-		stop = stop+1
-		if (stop > 3) {
-			looking_for_instances = false
-		} else {
-			console.log("########")
-			console.log(JSON.stringify(instance_stats[0]))
-
-		}
-	}
 	
-	return all_instances
+	idle_instances = await getAllResponses(base_uri, body, "POST")
+	
+	if (idle_instances.length == 0) {
+		console.log("*** No Idle instances found")
+		return []
+	}
+
+	idle_instance_ids = idle_instances.map(idle_instance => idle_instance.uuid)
+	
+	return idle_instance_ids
 }
 
+
+
 /*
- * Get all cloud instances.
+ * Captures logic related to handling the API cursor for large API responses.
  */
-/*
-async function getCloudInstances() {
-
-	base_uri = '/vmturbo/rest/search/?aspect_names=cloudAspect&q=&cursor='
-	cloud_search_body = {"criteriaList":[{"expType":"EQ","expVal":"AWS|AZURE","filterType":"vmsByCloudProvider","caseSensitive":false}],"logicalOperator":"AND","className":"VirtualMachine","scope":null}
+async function getAllResponses(base_uri, body, method) {
 	
-	/* API defaults to 500 max elements - so use cursor attribute, if needed, to call API multiple times to get all the instances. 
-	all_instances = []
-	cursor = 0
-	looking_for_instances = true
-	while (looking_for_instances) {
-		uri = base_uri + cursor
-		instance_search = await fetch(uri, {
-			method: 'POST',
-			body: JSON.stringify(cloud_search_body),
-	    	headers: {
-	        	'Content-Type': 'application/json'
-	      	}
-		})
-		instances = await instance_search.json()	
-		if (instances.length > 0) {
-			cursor = cursor + instances.length 
-			all_instances = all_instances.concat(instances)
+	all_responses = []
+	done = false
+	uri = base_uri
+	cursor_string = "?cursor="
+	if (base_uri.includes("?")) {
+		/* Then there's already parameters in the uri, so just add the cursor parameter if at all. */
+		cursor_string = "&cursor="
+	}
+	var api_response 
+	while (!done) {
+		
+		if (method == "GET") {
+			api_response = await fetch(uri, {
+				method: method,
+				headers: {
+					'Content-Type': 'application/json'
+				}
+			})
 		} else {
-			looking_for_instances = false
+			api_response = await fetch(uri, {
+				method: method,
+				body: JSON.stringify(body),
+	    		headers: {
+	        		'Content-Type': 'application/json'
+	      		}
+			})
+		}
+		responses = await api_response.json()	
+		
+		all_responses = all_responses.concat(responses)
+		
+		/* check if there are more to be gotten by checking the cursor header in the response */
+		cursor = getCursor(api_response)
+		if (cursor) {
+			uri = base_uri + cursor_string + cursor
+		} else {
+			done = true
 		}
 	}
 	
-	return all_instances
+	return all_responses
 }
-*/
 
+/*
+ * Returns the next cursor from the response if there is one.
+ */
+function getCursor(response) {
+	cursor = ""
+	for(let entry of response.headers.entries()) {
+		if (entry[0] == "x-next-cursor") {
+			cursor = entry[1]
+		}
+	}
+	return cursor
+}
 
+async function upsertStaticGroup(group_name, member_list) {
+	group_url = '/vmturbo/rest/groups'
+	vms_group_body = {
+		"isStatic": true,
+		"displayName": group_name,
+		"memberUuidList": member_list,
+		"criteriaList": [],
+		"groupType": "VirtualMachine"
+	}
+	
+	/* Either create a new group of Bus App VMs or update the existing group if it already exists. */
+	group_uuid = await getUuid("Group", group_name)
+	if (group_uuid) {
+		/* Found an existing group, so update it. */
+		await CreateUpdate_Group(group_url+"/"+group_uuid, 'PUT', vms_group_body) 
+		console.log("Updated VM Group: "+group_name)
+	} else {
+		/* Create a new group */
+		await CreateUpdate_Group(group_url, 'POST', vms_group_body) 
+		console.log("Created VM Group: "+group_name)
+	}
+} 
 
+async function CreateUpdate_Group(group_url, api_method, body) {
+	response = await fetch(group_url, {
+		method: api_method,
+		body: JSON.stringify(body),
+    	headers: {
+        	'Content-Type': 'application/json'
+      	}
+	})
+}
 
 
 /* Returns UUID for named entity of given type */
@@ -206,12 +291,6 @@ async function getUuid(entity_type, entity_name) {
 	} else if (entity_type == "Group") {
 		filterType = "groupsByName"
 		className = "Group"
-	} else if (entity_type == "Account") {
-		filterType = "businessAccountByName"
-		className = "BusinessAccount"
-	} else if (entity_type == "BillingFamily") {
-		filterType = "billingFamilyByName"
-		className = "BillingFamily"
 	} else {
 		console.log("getUuid: Called with incorrect entity_type")
 		return 0
@@ -240,95 +319,12 @@ async function getUuid(entity_type, entity_name) {
 	      }
 	})
 	info =  await response.json()
-	
 	if (info.length > 0) {
 		/* Found an existing entity so return uuid */
-		return {
-			"uuid":info[0].uuid,
-			"name":info[0].displayName
-		}
+		return info[0].uuid
 	}
 }
 
 function regExpEscape(literal_string) {
     return literal_string.replace(/[-[\]{}()*+!<=:?.\/\\^$|#\s,]/g, '\\$&');
 }
-
-
-
-
-/*
-
-API call to get memory stats
-Request URL: https://xl1.demo.turbonomic.com/vmturbo/rest/stats/?ascending=false&disable_hateoas=true&limit=50&order_by=VMem
-	body: {"scopes":["284560650706242"],"period":{"statistics":[{"name":"VMem"},{"name":"costPrice"}]},"relatedType":"VirtualMachine"}
-
-Response:
-	with mem metrics: NOTE the VMem section VALUES have numbers > 0
-	{
-	    "uuid": "73454410482404",
-	    "displayName": "AppDTurboAJNv3",
-	    "className": "VirtualMachine",
-	    "environmentType": "CLOUD",
-	    "stats": [
-	      {
-	        "date": "2020-06-10T20:51:25Z",
-	        "statistics": [
-	          {
-	            "name": "costPrice",
-	            "relatedEntityType": "VirtualMachine",
-	            "filters": [
-	              {
-	                "type": "costComponent",
-	                "value": "ON_DEMAND_COMPUTE"
-	              }
-	            ],
-	            "units": "$/h",
-	            "values": {
-	              "max": 0.146,
-	              "min": 0.004,
-	              "avg": 0.08584453,
-	              "total": 0.2575336
-	            },
-	            "value": 0.08584453
-	          },
-	          {
-	            "name": "VMem",
-	            "capacity": {
-	              "max": 7340032.0,
-	              "min": 7340032.0,
-	              "avg": 7340032.0,
-	              "total": 7340032.0,
-	              "totalMax": 7340032.0,
-	              "totalMin": 7340032.0
-	            },
-	            "reserved": {
-	              "max": 0.0,
-	              "min": 0.0,
-	              "avg": 0.0,
-	              "total": 0.0
-	            },
-	            "filters": [
-	              {
-	                "type": "relation",
-	                "value": "sold"
-	              }
-	            ],
-	            "units": "KB",
-	            "values": {
-	              "max": 7076864.0,
-	              "min": 7068262.5,
-	              "avg": 7068262.5,
-	              "total": 7068262.5,
-	              "totalMax": 7076864.0,
-	              "totalMin": 7068262.5
-	            },
-	            "value": 7068262.5
-	          }
-	        ],
-	        "epoch": "HISTORICAL"
-	      }
-	    ]
-	  },
-	
-*/
