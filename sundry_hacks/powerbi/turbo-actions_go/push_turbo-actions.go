@@ -94,7 +94,7 @@ type AppServerMapping struct {
 
 func main() {
 
-	// version note: More efficient use of Turbo API to gather all actions first and then map them to servers in the CSV.
+	// VERSION NOTE: More efficient use of Turbo API to gather all actions first and then map them to servers in the CSV.
 	version := "2.0" 
 	fmt.Println("push_turbo-actions version "+version)
 
