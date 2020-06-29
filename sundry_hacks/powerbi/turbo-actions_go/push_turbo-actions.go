@@ -16,6 +16,7 @@ Requires a Power BI streaming dataset defined with the following fields:
 - Action_To (Text)
 - Reason (Text)
 - Severity (Text)
+- Category (Text)
 
 .EXAMPLE
 PushTurboActions_PowerBI.ps1 -TurboInstance turbonomic.mycompany.com -TurboCredential $TurboCred -PowerBiCredential $PowerBiKey -AppServerMapCsv appserver.csv
@@ -40,6 +41,10 @@ Specify the path to a CSV that contains at least two columns:
 - Component_Id: This is the Application identifier
 - Server_Name: This is the server associated with the given component_id.
 Note this parameter may become vestigial or replaced once there is an API to get this information.
+
+.PARAMETER action_type
+Flag which action_type(s) to include in the output. 
+Options: TBD
 
 CROSS-COMPLIATION NOTES
 env GOOS=windows GOARCH=amd64 go build ./push_turbo-actions.go
@@ -72,6 +77,7 @@ type Action struct {
 	actionTo string
 	reason string
 	severity string
+	category string
 }
 
 type ServerAction struct {
@@ -88,7 +94,8 @@ type AppServerMapping struct {
 
 func main() {
 
-	version := "1.2"
+	// version note: More efficient use of Turbo API to gather all actions first and then map them to servers in the CSV.
+	version := "2.0" 
 	fmt.Println("push_turbo-actions version "+version)
 
 	// Process command line arguments
@@ -97,6 +104,7 @@ func main() {
 	turbo_instance := flag.String("turbo_instance", "", "Turbo IP or FQDN")
 	csv_file := flag.String("csv_file", "", "CSV File containing App to Server mapping - \"Component_id\" and \"Server_Name\" columns required")
 	powerbi_stream_url := flag.String("powerbi_stream_url", "", "URL for the PowerBI Stream Dataset")
+	//action_type := flag.String("action_type", "", "(Optional) Actions to output. Options: TBD")
 
 	flag.Parse()
 	
@@ -119,24 +127,41 @@ func main() {
 		fmt.Println("- Action_To (Text)")
 		fmt.Println("- Reason (Text)")
 		fmt.Println("- Severity (Text)")
+		fmt.Println("- Category (Text)")
 
 		os.Exit(1)
 	}
 	// end command line arguments
 	
+	time_start := time.Now()
+	
 	// Process the CSV file to extract the Application to Server Mapping
-	fmt.Println("Processing CSV file for application to server mapping ...")
+	fmt.Println("*** Processing CSV file for application to server mapping ...")
 	var appServerMapping  []AppServerMapping
 	appServerMapping = getAppServerMapping(*csv_file)
-
-
+	
+	time_now := time.Now()
+	time_elapsed := int(time_now.Sub(time_start).Seconds())
+	fmt.Printf("took %d seconds.\n\n", time_elapsed)
+	time_start = time_now
+	
 	// Call Turbo to get any actions for the servers assigned to each application
-	fmt.Println("Getting actions from Turbo ...")
+	fmt.Println("*** Getting actions from Turbo ...")
 	appServerMapping = addAppServerActions(appServerMapping, *turbo_instance, *turbo_user, *turbo_password)
 
+	time_now = time.Now()
+	time_elapsed = int(time_now.Sub(time_start).Seconds())
+	fmt.Printf("took %d seconds.\n\n", time_elapsed)
+	time_start = time_now
+
 	// Call PowerBI API to push data to the stream dataset
-	fmt.Println("Sending records to PowerBI ...")
+	fmt.Println("*** Sending records to PowerBI ...")
 	pushPowerBiData(appServerMapping, *powerbi_stream_url)
+
+	time_now = time.Now()
+	time_elapsed = int(time_now.Sub(time_start).Seconds())
+	fmt.Printf("took %d seconds.\n\n", time_elapsed)
+	time_start = time_now
 	
 	fmt.Println("Done.")
 }
@@ -205,20 +230,28 @@ func getAppServerMapping(csv_file string) []AppServerMapping {
 
 // Adds the actions to the app-server mapping structure
 func addAppServerActions(appServerMapping []AppServerMapping, turbo_instance string, turbo_user string, turbo_password string) []AppServerMapping {
-	// Turbo authentication
-	auth := turboLogin(turbo_instance, turbo_user, turbo_password) 
-	
-	// Each item from appServerMapping is a structure containing the application ID and 
-	var serverUuid string
+	// Get all the actions for all the servers
+	allServerActions,serverUuids := getAllActions(turbo_instance, turbo_user, turbo_password) 
+
+	// Each item from appServerMapping is a structure containing the application ID and server ID
+	var serverName, serverUuid string
+	var serverUuidsList []string
 	for _,app := range appServerMapping {
 		fmt.Println("Getting actions for servers in Application: "+app.appName)
 		for srv_idx,server := range app.serverActions {
 			// Get the actions for the given server and add to the given server's actions struct
 			// If the server is not found, it'll be marked as NOTFOUND and we can catch that later if needed
-			serverUuid = getVmId(turbo_instance, server.serverName, auth ) 
-			app.serverActions[srv_idx].serverUuid = serverUuid
-			if (serverUuid != "NOTFOUND") {
-				app.serverActions[srv_idx].actions = getServerActions(turbo_instance, serverUuid, auth) 
+			serverName = server.serverName
+			serverUuidsList = serverUuids[serverName]
+
+			// skip any servers that do not have any actions in the actions map
+			if (len(serverUuidsList) != 0) {
+				serverUuid = serverUuidsList[0]
+				if (len(serverUuidsList) > 1) {
+					fmt.Println("NOTE: Found multiple instances of server, "+serverName+". Using UUID: "+serverUuid)
+				}
+				app.serverActions[srv_idx].serverUuid = serverUuid
+				app.serverActions[srv_idx].actions = allServerActions[serverName]
 			}
 		}
 	}
@@ -336,9 +369,98 @@ func getFileInfo(csv_file string) (int, int, int, int) {
 }
 
 // Get actions for given server UUID
-func getServerActions (turbo_instance string, server_id string,  auth string) []Action {
+// func getServerActions (turbo_instance string, server_id string,  auth string) []Action {
+// 
+// 	url := "https://"+ turbo_instance +"/vmturbo/rest/entities/"+ server_id +"/actions" 
+// 	method := "POST"
+// 	// We only care about resize actions
+// 	payload := strings.NewReader("{\"actionTypeList\":[\"RESIZE\",\"RIGHT_SIZE\",\"SCALE\"],\"environmentType\":\"HYBRID\",\"detailLevel\":\"EXECUTION\"}")
+// 	
+// 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
+// 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+// 	client := &http.Client{Transport: customTransport}	
+// 	
+// 	// create and make the request
+// 	req, err := http.NewRequest(method, url, payload)
+// 	if err != nil {
+// 		fmt.Println(err)
+// 	}
+// 	req.Header.Add("Content-Type", "application/json")
+// 	req.Header.Add("Cookie", auth)
+// 	res, err := client.Do(req)
+// 	if err != nil {
+//     	fmt.Println(err)
+//     	os.Exit(3)
+//   	}
+// 
+// 	defer res.Body.Close()
+// 	// essentially creates a stringified version of the body's json
+// 	body, _ := ioutil.ReadAll(res.Body)
+// 	
+// 	// Since the search results is an array of json,
+// 	// Create an array of one of these interface things to unmarshal the stringified json into
+// 	var responseActions []map[string]interface{}
+// 	err = json.Unmarshal([]byte(body), &responseActions)
+// 	if err != nil {
+// 		fmt.Println(err)
+//     	os.Exit(4)
+// 	}
+// 
+// 	var serverActions []Action
+// 	var riskcommodity string
+// 	var fromval, toval float64
+// 	for _, responseAction := range responseActions {
+// 		var serverAction Action
+// 		serverAction.actionUuid = responseAction["uuid"].(string)
+// 		serverAction.actionType = responseAction["actionType"].(string)
+// 		serverAction.reason = responseAction["risk"].(map[string]interface{})["description"].(string)
+// 		serverAction.severity = responseAction["risk"].(map[string]interface{})["severity"].(string)
+// 		serverAction.category = responseAction["risk"].(map[string]interface{})["subCategory"].(string)
+// 
+// 		serverAction.actionDetails = responseAction["details"].(string)
+// 		if  (responseAction["target"].(map[string]interface{})["environmentType"] == "CLOUD") {
+// 			serverAction.actionFrom = responseAction["currentEntity"].(map[string]interface{})["displayName"].(string)
+// 			serverAction.actionTo = responseAction["newEntity"].(map[string]interface{})["displayName"].(string)
+// 		} else {
+// 			riskcommodity = responseAction["risk"].(map[string]interface{})["reasonCommodity"].(string)
+// 			if (riskcommodity == "VCPU") {
+// 				// Get CPU values (in float)
+// 				fromval, _ = strconv.ParseFloat(responseAction["currentValue"].(string), 32)
+// 				toval, _ = strconv.ParseFloat(responseAction["resizeToValue"].(string), 32)
+// 				// Convert from float to int
+// 				serverAction.actionFrom = strconv.Itoa(int(fromval))
+// 				serverAction.actionTo = strconv.Itoa(int(toval))
+// 			} else if (riskcommodity == "VMem") {
+// 				fromval, _ = strconv.ParseFloat(responseAction["currentValue"].(string), 32)
+// 				// Convert to GB
+// 				fromval = (fromval/(1024*1024))
+// 				toval, _ = strconv.ParseFloat(responseAction["resizeToValue"].(string), 32)
+// 				// Convert to GB
+// 				toval = (toval/(1024*1024))
+// 				// Convert from float to int
+// 				serverAction.actionFrom = strconv.Itoa(int(fromval))
+// 				serverAction.actionTo = strconv.Itoa(int(toval))
+// 			} else {
+// 				serverAction.actionFrom = "NA"
+// 				serverAction.actionTo = "NA"
+// 			}
+// 
+// 		}
+// 		serverActions = append(serverActions, serverAction)
+// 	}
+// 	
+// 	return serverActions
+// }	
 
-	url := "https://"+ turbo_instance +"/vmturbo/rest/entities/"+ server_id +"/actions" 
+// Calls Turbo Actions API to get all actions currently identified by Turbo.
+// This will later be used to build the application-server-action mapping that is pushed to PowerBi
+func getAllActions (turbo_instance string, turbo_user string, turbo_password string) (map[string][]Action, map[string][]string) {
+
+	
+	auth := turboLogin(turbo_instance, turbo_user, turbo_password) 
+	
+	base_url := "https://"+turbo_instance+"/vmturbo/rest/markets/Market/actions"
+	url := base_url
 	method := "POST"
 	// We only care about resize actions
 	payload := strings.NewReader("{\"actionTypeList\":[\"RESIZE\",\"RIGHT_SIZE\",\"SCALE\"],\"environmentType\":\"HYBRID\",\"detailLevel\":\"EXECUTION\"}")
@@ -346,76 +468,112 @@ func getServerActions (turbo_instance string, server_id string,  auth string) []
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	client := &http.Client{Transport: customTransport}	
+
+	var allResizeActions map[string][]Action
+	var allActionServerUuids map[string][]string
+	allResizeActions = make(map[string][]Action)
+	allActionServerUuids = make(map[string][]string)
+
 	
-	// create and make the request
-	req, err := http.NewRequest(method, url, payload)
-	if err != nil {
-		fmt.Println(err)
-	}
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Cookie", auth)
-	res, err := client.Do(req)
-	if err != nil {
-    	fmt.Println(err)
-    	os.Exit(3)
-  	}
-
-	defer res.Body.Close()
-	// essentially creates a stringified version of the body's json
-	body, _ := ioutil.ReadAll(res.Body)
-	
-	// Since the search results is an array of json,
-	// Create an array of one of these interface things to unmarshal the stringified json into
-	var responseActions []map[string]interface{}
-	err = json.Unmarshal([]byte(body), &responseActions)
-	if err != nil {
-		fmt.Println(err)
-    	os.Exit(4)
-	}
-
-	var serverActions []Action
-	var riskcommodity string
-	var fromval, toval float64
-	for _, responseAction := range responseActions {
-		var serverAction Action
-		serverAction.actionUuid = responseAction["uuid"].(string)
-		serverAction.actionType = responseAction["actionType"].(string)
-		serverAction.reason = responseAction["risk"].(map[string]interface{})["description"].(string)
-		serverAction.severity = responseAction["risk"].(map[string]interface{})["severity"].(string)
-		serverAction.actionDetails = responseAction["details"].(string)
-		if  (responseAction["target"].(map[string]interface{})["environmentType"] == "CLOUD") {
-			serverAction.actionFrom = responseAction["currentEntity"].(map[string]interface{})["displayName"].(string)
-			serverAction.actionTo = responseAction["newEntity"].(map[string]interface{})["displayName"].(string)
-		} else {
-			riskcommodity = responseAction["risk"].(map[string]interface{})["reasonCommodity"].(string)
-			if (riskcommodity == "VCPU") {
-				// Get CPU values (in float)
-				fromval, _ = strconv.ParseFloat(responseAction["currentValue"].(string), 32)
-				toval, _ = strconv.ParseFloat(responseAction["resizeToValue"].(string), 32)
-				// Convert from float to int
-				serverAction.actionFrom = strconv.Itoa(int(fromval))
-				serverAction.actionTo = strconv.Itoa(int(toval))
-			} else if (riskcommodity == "VMem") {
-				fromval, _ = strconv.ParseFloat(responseAction["currentValue"].(string), 32)
-				// Convert to GB
-				fromval = (fromval/(1024*1024))
-				toval, _ = strconv.ParseFloat(responseAction["resizeToValue"].(string), 32)
-				// Convert to GB
-				toval = (toval/(1024*1024))
-				// Convert from float to int
-				serverAction.actionFrom = strconv.Itoa(int(fromval))
-				serverAction.actionTo = strconv.Itoa(int(toval))
-			} else {
-				serverAction.actionFrom = "NA"
-				serverAction.actionTo = "NA"
-			}
-
+	done := false
+	for (!done) {
+		
+		// create and make the request
+		req, err := http.NewRequest(method, url, payload)
+		if err != nil {
+			fmt.Println(err)
 		}
-		serverActions = append(serverActions, serverAction)
+		req.Header.Add("Content-Type", "application/json")
+		req.Header.Add("Cookie", auth)
+		res, err := client.Do(req)
+		if err != nil {
+    		fmt.Println(err)
+    		os.Exit(3)
+  		}
+
+		defer res.Body.Close()
+		// essentially creates a stringified version of the body's json
+		body, _ := ioutil.ReadAll(res.Body)
+		
+		// Since the results is an array of json,
+		// Create an array of one of these interface things to unmarshal the stringified json into
+		var responseActions []map[string]interface{}
+		err = json.Unmarshal([]byte(body), &responseActions)
+		if err != nil {
+			fmt.Println(err)
+    		os.Exit(4)
+		}
+		
+		
+		// Map that indexes by server name and contains all the resize actions for that server name
+		// Later on we'll use that sever name to map the actions to the applicable application (aka componen)
+		var allActions []Action
+		var riskcommodity string
+		var fromval, toval float64
+		for _, responseAction := range responseActions {
+			var serverName, serverUuid string
+			var action Action
+			var actionFrom, actionTo string
+			
+			serverName = responseAction["target"].(map[string]interface{})["displayName"].(string)
+			serverUuid = responseAction["target"].(map[string]interface{})["uuid"].(string)
+	
+			action.actionUuid = responseAction["uuid"].(string)
+			action.actionType = responseAction["actionType"].(string)
+			action.reason = responseAction["risk"].(map[string]interface{})["description"].(string)
+			action.severity = responseAction["risk"].(map[string]interface{})["severity"].(string)
+			action.category = responseAction["risk"].(map[string]interface{})["subCategory"].(string)
+			action.actionDetails = responseAction["details"].(string)
+			if  (responseAction["target"].(map[string]interface{})["environmentType"] == "CLOUD") {
+				actionFrom = responseAction["currentEntity"].(map[string]interface{})["displayName"].(string)
+				actionTo = responseAction["newEntity"].(map[string]interface{})["displayName"].(string)
+			} else {
+				riskcommodity = responseAction["risk"].(map[string]interface{})["reasonCommodity"].(string)
+				if (riskcommodity == "VCPU") {
+					// Get CPU values (in float)
+					fromval, _ = strconv.ParseFloat(responseAction["currentValue"].(string), 32)
+					toval, _ = strconv.ParseFloat(responseAction["resizeToValue"].(string), 32)
+					// Convert from float to int
+					actionFrom = strconv.Itoa(int(fromval))
+					actionTo = strconv.Itoa(int(toval))
+				} else if (riskcommodity == "VMem") {
+					fromval, _ = strconv.ParseFloat(responseAction["currentValue"].(string), 32)
+					// Convert to GB
+					fromval = (fromval/(1024*1024))
+					toval, _ = strconv.ParseFloat(responseAction["resizeToValue"].(string), 32)
+					// Convert to GB
+					toval = (toval/(1024*1024))
+					// Convert from float to int
+					actionFrom = strconv.Itoa(int(fromval))
+					actionTo = strconv.Itoa(int(toval))
+				} else {
+					actionFrom = "NA"
+					actionTo = "NA"
+				}
+	
+			}
+			action.actionFrom = actionFrom
+			action.actionTo = actionTo
+			allActions = append(allResizeActions[serverName], action)
+			allResizeActions[serverName] = allActions
+
+			allActionServerUuids[serverName] = append(allActionServerUuids[serverName], serverUuid)
+		}
+		
+		// Are there more actions to get from the API?
+		cursor := res.Header.Get("X-Next-Cursor")
+		if (len(cursor) > 0) {
+			url = base_url + "?cursor="+cursor
+		} else {
+			done = true
+		}
 	}
 	
-	return serverActions
+	return allResizeActions, allActionServerUuids 
 }	
+	
+
+
 
 // get VM UUID
 func getVmId(turbo_instance string, server_name string, auth string) string {
@@ -444,6 +602,11 @@ func getVmId(turbo_instance string, server_name string, auth string) string {
   	}
 
 	defer res.Body.Close()
+	
+	// Get cursor header to use for subsequent calls if needed
+	cursor := res.Header.Get("X-Next-Cursor")
+	fmt.Println("CURSOR: "+cursor)
+
 	// essentially creates a stringified version of the body's json
 	body, _ := ioutil.ReadAll(res.Body)
 	//fmt.Println(string(body))
