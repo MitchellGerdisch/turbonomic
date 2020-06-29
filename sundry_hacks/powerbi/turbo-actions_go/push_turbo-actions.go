@@ -277,8 +277,9 @@ func pushPowerBiData(appServerMapping []AppServerMapping, powerbi_url string) {
 				actionto_part := "\"Action_To\": \""+action.actionTo+"\""
 				reason_part := "\"Reason\": \""+action.reason+"\""
 				severity_part := "\"Severity\": \""+action.severity+"\""
+				category_part := "\"Category\": \""+action.category+"\""
 				
-				payload := strings.NewReader("[{"+timestamp_part+","+appid_part+","+appname_part+","+servername_part+","+actiondetails_part+","+actiontype_part+","+actionfrom_part+","+actionto_part+","+reason_part+","+severity_part+"}]")
+				payload := strings.NewReader("[{"+timestamp_part+","+appid_part+","+appname_part+","+servername_part+","+actiondetails_part+","+actiontype_part+","+actionfrom_part+","+actionto_part+","+reason_part+","+severity_part+","+category_part+"}]")
 				
 				client := &http.Client {}
   				req, err := http.NewRequest(method, powerbi_url, payload)
