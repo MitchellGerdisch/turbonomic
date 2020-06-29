@@ -491,62 +491,6 @@ func getAllActions (turbo_instance string, turbo_user string, turbo_password str
 
 
 
-// get VM UUID
-func getVmId(turbo_instance string, server_name string, auth string) string {
-
-	url := "https://"+ turbo_instance +"/api/v3/search?q="
-	method := "POST"
-	
-	// VM search payload
-	vm_payload := strings.NewReader("{\n  \"className\": \"VirtualMachine\",\n  \"criteriaList\": [\n    {\n      \"expVal\": \"^"+server_name+"$\",\n      \"caseSensitive\": \"\",\n      \"filterType\": \"vmsByName\",\n      \"expType\": \"RXEQ\"\n    }\n  ],\n  \"logicalOperator\": \"AND\"\n}")
-	
-	customTransport := http.DefaultTransport.(*http.Transport).Clone()
-	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	client := &http.Client{Transport: customTransport}	
-
-	// create and make the request
-	req, err := http.NewRequest(method, url, vm_payload)
-	if err != nil {
-		fmt.Println(err)
-	}
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Cookie", auth)
-	res, err := client.Do(req)
-	if err != nil {
-    	fmt.Println(err)
-    	os.Exit(3)
-  	}
-
-	defer res.Body.Close()
-	
-	// Get cursor header to use for subsequent calls if needed
-	cursor := res.Header.Get("X-Next-Cursor")
-	fmt.Println("CURSOR: "+cursor)
-
-	// essentially creates a stringified version of the body's json
-	body, _ := ioutil.ReadAll(res.Body)
-	//fmt.Println(string(body))
-	
-	// Since the search results is an array of json,
-	// Create an array of one of these interface things to unmarshal the stringified json into
-	var searchResults []map[string]interface{}
-	err = json.Unmarshal([]byte(body), &searchResults)
-	if err != nil {
-		fmt.Println(err)
-    	os.Exit(4)
-	}
-	// now searchResults is an array of structures that we can index.
-	// There's only one result so we're hardcoding the array index and we only care about the uuid
-	//fmt.Println("searchResults")
-	//fmt.Println(searchResults)
-	
-	if (len(searchResults) > 0) {
-		return searchResults[0]["uuid"].(string)
-	} else {
-		return "NOTFOUND"
-	}
-}	
-
 // Login to turbo
 func turboLogin(turbo_instance string, turbo_user string, turbo_password string) string {
 
