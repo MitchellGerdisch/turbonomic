@@ -95,9 +95,10 @@ type AppServerMapping struct {
 
 func main() {
 
-	// MAJOR VERSION NOTE: More efficient use of Turbo API to gather all actions first and then map them to servers in the CSV.
-	// MINOR VERSION NOTE: Fixed bug in HTTP payload when calling API for actions.
-	version := "2.1" 
+	// 2.x MAJOR VERSION NOTE: More efficient use of Turbo API to gather all actions first and then map them to servers in the CSV.
+	// 2.1 MINOR VERSION NOTE: Fixed bug in HTTP payload when calling API for actions.
+	// 2.2 MINOR VERSION NOTE: Changed PowerBI API logic to send sets of actions for a given application instead of one at a time for each server.
+	version := "2.2" 
 	fmt.Println("push_turbo-actions version "+version)
 
 	// Process command line arguments
@@ -267,6 +268,7 @@ func pushPowerBiData(appServerMapping []AppServerMapping, powerbi_url string) {
   	method := "POST"
 	
 	for _,app := range appServerMapping {
+		var payload string
 		for _,server := range app.serverActions {
 			for _,action := range server.actions {
 				timestamp_part := "\"Timestamp\": \""+timeString+"\""
@@ -281,19 +283,31 @@ func pushPowerBiData(appServerMapping []AppServerMapping, powerbi_url string) {
 				severity_part := "\"Severity\": \""+action.severity+"\""
 				category_part := "\"Category\": \""+action.category+"\""
 				
-				payload := strings.NewReader("[{"+timestamp_part+","+appid_part+","+appname_part+","+servername_part+","+actiondetails_part+","+actiontype_part+","+actionfrom_part+","+actionto_part+","+reason_part+","+severity_part+","+category_part+"}]")
-				
-				client := &http.Client {}
-  				req, err := http.NewRequest(method, powerbi_url, payload)
-  				if err != nil {
-    				fmt.Println(err)
-  				}
-  				req.Header.Add("Content-Type", "application/json")
-	
-  				res, _:= client.Do(req)
-  				defer res.Body.Close()
+				action_payload := "{"+timestamp_part+","+appid_part+","+appname_part+","+servername_part+","+actiondetails_part+","+actiontype_part+","+actionfrom_part+","+actionto_part+","+reason_part+","+severity_part+","+category_part+"}"
+				if (payload == "") {
+					payload =  "[" + action_payload
+				} else {
+					payload = payload + "," + action_payload
+				}
   			}
 	  	}
+	  	payload = payload + "]"
+		client := &http.Client {}
+		req, err := http.NewRequest(method, powerbi_url, strings.NewReader(payload))
+		if err != nil {
+			fmt.Println(err)
+		}
+		req.Header.Add("Content-Type", "application/json")
+		
+		// For debugging HTTP Call
+// 		requestDump, err := httputil.DumpRequest(req, true)
+// 		if err != nil {
+// 				fmt.Println(err)
+// 		}
+// 		fmt.Println(string(requestDump))
+	
+		res, _:= client.Do(req)
+		defer res.Body.Close()
 	}
 }
 
