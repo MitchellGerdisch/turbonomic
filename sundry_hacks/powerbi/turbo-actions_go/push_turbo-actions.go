@@ -60,6 +60,7 @@ import (
     "fmt"
     "io/ioutil"
     "net/http"
+    // used if debugging http "net/http/httputil"
     "crypto/tls"
     "flag"
     "os"
@@ -94,8 +95,9 @@ type AppServerMapping struct {
 
 func main() {
 
-	// VERSION NOTE: More efficient use of Turbo API to gather all actions first and then map them to servers in the CSV.
-	version := "2.0" 
+	// MAJOR VERSION NOTE: More efficient use of Turbo API to gather all actions first and then map them to servers in the CSV.
+	// MINOR VERSION NOTE: Fixed bug in HTTP payload when calling API for actions.
+	version := "2.1" 
 	fmt.Println("push_turbo-actions version "+version)
 
 	// Process command line arguments
@@ -380,7 +382,7 @@ func getAllActions (turbo_instance string, turbo_user string, turbo_password str
 	url := base_url
 	method := "POST"
 	// We only care about resize actions
-	payload := strings.NewReader("{\"actionTypeList\":[\"RESIZE\",\"RIGHT_SIZE\",\"SCALE\"],\"environmentType\":\"HYBRID\",\"detailLevel\":\"EXECUTION\"}")
+	payload := []byte(`{"actionTypeList":["RESIZE","RIGHT_SIZE","SCALE"],"environmentType":"HYBRID","detailLevel":"EXECUTION"}`)
 	
 	customTransport := http.DefaultTransport.(*http.Transport).Clone()
 	customTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
@@ -394,14 +396,21 @@ func getAllActions (turbo_instance string, turbo_user string, turbo_password str
 	
 	done := false
 	for (!done) {
-		
 		// create and make the request
-		req, err := http.NewRequest(method, url, payload)
+		req, err := http.NewRequest(method, url, bytes.NewBuffer(payload))
 		if err != nil {
 			fmt.Println(err)
 		}
 		req.Header.Add("Content-Type", "application/json")
 		req.Header.Add("Cookie", auth)
+		
+// 		// For debugging HTTP Call
+// 		requestDump, err := httputil.DumpRequest(req, true)
+// 		if err != nil {
+//   			fmt.Println(err)
+// 		}
+// 		fmt.Println(string(requestDump))
+		
 		res, err := client.Do(req)
 		if err != nil {
     		fmt.Println(err)
@@ -416,10 +425,15 @@ func getAllActions (turbo_instance string, turbo_user string, turbo_password str
 		// Create an array of one of these interface things to unmarshal the stringified json into
 		var responseActions []map[string]interface{}
 		err = json.Unmarshal([]byte(body), &responseActions)
-		if err != nil {
-			fmt.Println(err)
-    		os.Exit(4)
-		}
+
+ 		if err != nil {
+ 			fmt.Println(err)
+   			fmt.Printf("#### ERROR decoding response: %v\n", err)
+    		if e, ok := err.(*json.SyntaxError); ok {
+        		fmt.Printf("#### ERROR syntax error at byte offset %d\n", e.Offset)
+    		}
+    		fmt.Printf("#### ERROR response: %q\n", body)
+ 		}
 		
 		
 		// Map that indexes by server name and contains all the resize actions for that server name
@@ -476,13 +490,15 @@ func getAllActions (turbo_instance string, turbo_user string, turbo_password str
 
 			allActionServerUuids[serverName] = append(allActionServerUuids[serverName], serverUuid)
 		}
-		
+
 		// Are there more actions to get from the API?
-		cursor := res.Header.Get("X-Next-Cursor")
+		cursor := res.Header.Get("x-next-cursor")
 		if (len(cursor) > 0) {
 			url = base_url + "?cursor="+cursor
+			fmt.Printf("... still getting actions (cursor=%s) ...\n",cursor)
 		} else {
 			done = true
+			fmt.Println("DONE GETTING ACTIONS")
 		}
 	}
 	
