@@ -243,14 +243,13 @@ func addAppServerActions(appServerMapping []AppServerMapping, turbo_instance str
 		fmt.Println("Getting actions for servers in Application: "+app.appName)
 		for srv_idx,server := range app.serverActions {
 			// Get the actions for the given server and add to the given server's actions struct
-			// If the server is not found, it'll be marked as NOTFOUND and we can catch that later if needed
+			// If the server doesn't have any actions, serverUuidsList will be empty
 			serverName = server.serverName
 			serverUuidsList = serverUuids[serverName]
 
 			// skip any servers that do not have any actions in the actions map
-			if (len(serverUuidsList) != 0) {
-				serverUuid = serverUuidsList[0]
-
+			if (len(serverUuidsList) > 0) {
+				serverUuid = serverUuidsList[0] 
 				app.serverActions[srv_idx].serverUuid = serverUuid
 				app.serverActions[srv_idx].actions = allServerActions[serverName]
 			}
@@ -501,9 +500,7 @@ func getAllActions (turbo_instance string, turbo_user string, turbo_password str
 			allResizeActions[serverName] = allActions
 			// add the server uuid to the map in case it's handy later.
 			allActionServerUuids[serverName] = append(allActionServerUuids[serverName], serverUuid)
-			if (serverUuid != allActionServerUuids[serverName][0]) {
-					fmt.Println("NOTE: Found multiple instances of server, "+serverName+".")
-			}
+
 		}
 
 		// Are there more actions to get from the API?
