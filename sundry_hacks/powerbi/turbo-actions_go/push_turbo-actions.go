@@ -52,21 +52,21 @@ env GOOS=windows GOARCH=amd64 go build ./push_turbo-actions.go
 */
 
 import (
-    "bytes"
- 	"mime/multipart"
-	"encoding/json"
-	"strings"
-	"strconv"
-    "fmt"
-    "io/ioutil"
-    "net/http"
-    // used if debugging http "net/http/httputil"
-    "crypto/tls"
-    "flag"
-    "os"
-    "encoding/csv"
-    "io"
-    "time"
+     "bytes"
+  	"mime/multipart"
+ 	"encoding/json"
+ 	"strings"
+ 	"strconv"
+     "fmt"
+     "io/ioutil"
+     "net/http"
+     // used if debugging http "net/http/httputil"
+     "crypto/tls"
+     "flag"
+     "os"
+     "encoding/csv"
+     "io"
+     "time"
     //"reflect"
 )
 
@@ -98,7 +98,8 @@ func main() {
 	// 2.x MAJOR VERSION NOTE: More efficient use of Turbo API to gather all actions first and then map them to servers in the CSV.
 	// 2.1 MINOR VERSION NOTE: Fixed bug in HTTP payload when calling API for actions.
 	// 2.2 MINOR VERSION NOTE: Changed PowerBI API logic to send sets of actions for a given application instead of one at a time for each server.
-	version := "2.2" 
+	// 2.3 MINOR VERSION NOTE: Updated code to build map of app to server to allow for more efficient processing.
+	version := "2.3" 
 	fmt.Println("push_turbo-actions version "+version)
 
 	// Process command line arguments
@@ -140,8 +141,7 @@ func main() {
 	
 	// Process the CSV file to extract the Application to Server Mapping
 	fmt.Println("*** Processing CSV file for application to server mapping ...")
-	var appServerMapping  []AppServerMapping
-	appServerMapping = getAppServerMapping(*csv_file)
+	appId2Name,appId2Servers := getAppServerMapping(*csv_file)
 	
 	time_now := time.Now()
 	time_elapsed := int(time_now.Sub(time_start).Seconds())
@@ -150,7 +150,7 @@ func main() {
 	
 	// Call Turbo to get any actions for the servers assigned to each application
 	fmt.Println("*** Getting actions from Turbo ...")
-	appServerMapping = addAppServerActions(appServerMapping, *turbo_instance, *turbo_user, *turbo_password)
+	allServerActions,serverUuids := getAllActions(*turbo_instance, *turbo_user, *turbo_password) 
 
 	time_now = time.Now()
 	time_elapsed = int(time_now.Sub(time_start).Seconds())
@@ -159,7 +159,7 @@ func main() {
 
 	// Call PowerBI API to push data to the stream dataset
 	fmt.Println("*** Sending records to PowerBI ...")
-	pushPowerBiData(appServerMapping, *powerbi_stream_url)
+	pushPowerBiData(appId2Name,appId2Servers,allServerActions,serverUuids, *powerbi_stream_url)
 
 	time_now = time.Now()
 	time_elapsed = int(time_now.Sub(time_start).Seconds())
@@ -170,22 +170,21 @@ func main() {
 }
 
 // Processes the CSV and creates a base mapping of applications (aka components) and servers
-func getAppServerMapping(csv_file string) []AppServerMapping {
+// Returns:
+//   map: App ID -> App Name as given in the CSV
+//   map: App ID -> array of Server Names as given in the CSV
+func getAppServerMapping(csv_file string) (map[string]string, map[string][]string) {
 
 	// Get size of file and application and server name column numbers for subsequent processing
 	var componentIdColumn, componentNameColumn, serverNameColumn int
 	_, componentIdColumn, componentNameColumn, serverNameColumn = getFileInfo(csv_file)
 	
 	// For storing the app to server mappings (and later the server actions)
-	var appServerMapping []AppServerMapping
-	var currentApp,blankApp AppServerMapping
-	//blankApp.appId = "nowayanythingisnamedthis"
-	currentApp = blankApp
-	
-	// For storing servers associated with a given app
-	// The actions part will be filled in later
-	var server ServerAction
-	
+	var appId2Name map[string]string
+	var appId2Servers map[string][]string
+	appId2Name = make(map[string]string)
+	appId2Servers = make(map[string][]string)
+
 	// Read through the file this time to build the application to server mapping
 	fileLine := 1
 	appservercsv, err := os.Open(csv_file)
@@ -206,72 +205,68 @@ func getAppServerMapping(csv_file string) []AppServerMapping {
 		} else {
 			// Skip the first line which contains the column headings
 			if (fileLine > 1) {
-				// Check if we have come across a new application name
-				if (currentApp.appId != record[componentIdColumn]) {
-					// We've got a new app, so push the current on to the array if it's not the initial loop and start a new one
-					if (currentApp.appId != "") {
-						appServerMapping = append(appServerMapping, currentApp)
-					}
-					currentApp = blankApp
-					currentApp.appId = record[componentIdColumn]
-					currentApp.appName = record[componentNameColumn]
-				} 
-
-				// store the server associated with the current app
-				server.serverName = record[serverNameColumn]
-				currentApp.serverActions = append(currentApp.serverActions, server)
+			
+				appId := record[componentIdColumn]
+				appName := record[componentNameColumn]
+				serverName := record[serverNameColumn]
+				
+				appId2Name[appId] = appName	
+				appId2Servers[appId] = append(appId2Servers[appId], serverName)
 			}	
 			fileLine += 1
 		}
 	}	
 	
-	// Add the last serverActions block
-	appServerMapping = append(appServerMapping, currentApp)
-
-	return appServerMapping
+	return appId2Name, appId2Servers
 }
+// 
+// // Calls Turbo API to get ALL current actions.
+// // Returns:
+// // - map: Server Name as found in the actions -> Server UUID(s) as found in the actions. This should be all the same UUIDs but it's being kept in case some debugging is needed.
+// // - map: Server Name as found in the actions -> Array of Actions associated with the server.
+// func getServerActions(turbo_instance string, turbo_user string, turbo_password string) (map[string][]string, map[string][]Action) {
+// 	// Get all the resize actions for all the servers
+// 	// This is more than we need, but it's the most efficient way to get the data out of Turbo's API.
+// 	allServerActions,serverUuids := getAllActions(turbo_instance, turbo_user, turbo_password) 
+// 
+// 	// Each item from appServerMapping is a structure containing the application ID and server ID
+// 	var serverName, serverUuid string
+// 	var serverUuidsList []string
+// 	for _,app := range appServerMapping {
+// 		fmt.Println("Getting actions for servers in Application: "+app.appName)
+// 		for srv_idx,server := range app.serverActions {
+// 			// Get the actions for the given server and add to the given server's actions struct
+// 			// If the server doesn't have any actions, serverUuidsList will be empty
+// 			serverName = server.serverName
+// 			serverUuidsList = serverUuids[serverName]
+// 
+// 			// skip any servers that do not have any actions in the actions map
+// 			if (len(serverUuidsList) > 0) {
+// 				serverUuid = serverUuidsList[0] 
+// 				app.serverActions[srv_idx].serverUuid = serverUuid
+// 				app.serverActions[srv_idx].actions = allServerActions[serverName]
+// 			}
+// 		}
+// 	}
+// 	return appServerMapping
+// }
 
-// Adds the actions to the app-server mapping structure
-func addAppServerActions(appServerMapping []AppServerMapping, turbo_instance string, turbo_user string, turbo_password string) []AppServerMapping {
-	// Get all the actions for all the servers
-	allServerActions,serverUuids := getAllActions(turbo_instance, turbo_user, turbo_password) 
 
-	// Each item from appServerMapping is a structure containing the application ID and server ID
-	var serverName, serverUuid string
-	var serverUuidsList []string
-	for _,app := range appServerMapping {
-		fmt.Println("Getting actions for servers in Application: "+app.appName)
-		for srv_idx,server := range app.serverActions {
-			// Get the actions for the given server and add to the given server's actions struct
-			// If the server doesn't have any actions, serverUuidsList will be empty
-			serverName = server.serverName
-			serverUuidsList = serverUuids[serverName]
-
-			// skip any servers that do not have any actions in the actions map
-			if (len(serverUuidsList) > 0) {
-				serverUuid = serverUuidsList[0] 
-				app.serverActions[srv_idx].serverUuid = serverUuid
-				app.serverActions[srv_idx].actions = allServerActions[serverName]
-			}
-		}
-	}
-	return appServerMapping
-}
-
-func pushPowerBiData(appServerMapping []AppServerMapping, powerbi_url string) {
+// Using the data found in the various maps, assemble API calls to push PowerBi to push the data stream
+func pushPowerBiData(appId2Name map[string]string, appId2Servers map[string][]string, allServerActions map[string][]Action, serverUuids map[string][]string, powerbi_url string) {
 
 	t := time.Now()
 	timeString := t.Format(time.RFC3339)
   	method := "POST"
 	
-	for _,app := range appServerMapping {
+	for appId,appName := range appId2Name {
 		var payload string
-		for _,server := range app.serverActions {
-			for _,action := range server.actions {
+		for _,serverName := range appId2Servers[appId] {
+			for _,action := range allServerActions[serverName] {
 				timestamp_part := "\"Timestamp\": \""+timeString+"\""
-				appid_part := "\"Component_ID\": \""+app.appId+"\""
-				appname_part := "\"Component_Name\": \""+app.appName+"\""
-				servername_part := "\"Server_Name\": \""+server.serverName+"\""
+				appid_part := "\"Component_ID\": \""+appId+"\""
+				appname_part := "\"Component_Name\": \""+appName+"\""
+				servername_part := "\"Server_Name\": \""+serverName+"\""
 				actiondetails_part := "\"Action_Details\": \""+action.actionDetails+"\""
 				actiontype_part := "\"Action_Type\": \""+action.actionType+"\""
 				actionfrom_part := "\"Action_From\": \""+action.actionFrom+"\""
@@ -296,7 +291,7 @@ func pushPowerBiData(appServerMapping []AppServerMapping, powerbi_url string) {
 		}
 		req.Header.Add("Content-Type", "application/json")
 		
-		// For debugging HTTP Call
+// 		// For debugging HTTP Call
 // 		requestDump, err := httputil.DumpRequest(req, true)
 // 		if err != nil {
 // 				fmt.Println(err)
@@ -382,10 +377,14 @@ func getFileInfo(csv_file string) (int, int, int, int) {
 	return numLines, componentIdColumn, componentNameColumn, serverNameColumn
 }
 
-// Calls Turbo Actions API to get all actions currently identified by Turbo.
-// This will later be used to build the application-server-action mapping that is pushed to PowerBi
+// Calls Turbo Actions API to get all resize actions currently identified by Turbo.
+// Returns:
+// - map: Server Name as found in the actions -> Array of Server UUIDs found in the actions for the given server name. 
+// - map: Server Name as found in the actions -> Array of Actions for the server.
+// CAVEAT: This and related logic assumes server names are unique in the system. If that is not the case, then the server name -> server UUID mapping
+// may be used to debug that and figure out how best to handle the situation. But since the CSV is the rosetta stone here and it does
+// not have Turbo UUIDs in it, we have to use the Server Name as the key.
 func getAllActions (turbo_instance string, turbo_user string, turbo_password string) (map[string][]Action, map[string][]string) {
-
 	
 	auth := turboLogin(turbo_instance, turbo_user, turbo_password) 
 	
@@ -510,7 +509,7 @@ func getAllActions (turbo_instance string, turbo_user string, turbo_password str
 			fmt.Printf("... still getting actions (cursor=%s) ...\n",cursor)
 		} else {
 			done = true
-			fmt.Println("DONE GETTING ACTIONS")
+			//fmt.Println("DONE GETTING ACTIONS")
 		}
 	}
 	
