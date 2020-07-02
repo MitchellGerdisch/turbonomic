@@ -261,6 +261,7 @@ func pushPowerBiData(appId2Name map[string]string, appId2Servers map[string][]st
 	
 	for appId,appName := range appId2Name {
 		var payload string
+		app_action_count := 0
 		for _,serverName := range appId2Servers[appId] {
 			for _,action := range allServerActions[serverName] {
 				timestamp_part := "\"Timestamp\": \""+timeString+"\""
@@ -276,6 +277,7 @@ func pushPowerBiData(appId2Name map[string]string, appId2Servers map[string][]st
 				category_part := "\"Category\": \""+action.category+"\""
 				
 				action_payload := "{"+timestamp_part+","+appid_part+","+appname_part+","+servername_part+","+actiondetails_part+","+actiontype_part+","+actionfrom_part+","+actionto_part+","+reason_part+","+severity_part+","+category_part+"}"
+				app_action_count++ 
 				if (payload == "") {
 					payload =  "[" + action_payload
 				} else {
@@ -300,6 +302,8 @@ func pushPowerBiData(appId2Name map[string]string, appId2Servers map[string][]st
 	
 		res, _:= client.Do(req)
 		defer res.Body.Close()
+		
+		fmt.Printf("... sent %d action(s) for application %s\n", app_action_count, appName)
 	}
 }
 
