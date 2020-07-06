@@ -9,7 +9,7 @@ getCostImprovingActions_xl()
 async function getCostImprovingActions_xl() { 
 	
 	console.log("")
-	console.log("**** Looking for RI-improving actions ... this may take a few minutes ...")
+	console.log("**** Looking for cost-improving performance actions ... this may take a few minutes ...")
 	console.log("")
 	
 	current_market = await getCurrentMarket()
@@ -100,6 +100,7 @@ async function findCostImprovingActions(market) {
 			console.log("**** ... still looking for actions ...")
 		}
 		action = all_actions[a]
+		console.log("*** DEBUG: "+JSON.stringify(action))
 		savings = action.stats[0].value
 		
 		if (savings > 0) {
