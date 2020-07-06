@@ -39,6 +39,7 @@ Currently, this is the URL with the key that one gets when creating a Streaming 
 .PARAMETER csv_file
 Specify the path to a CSV that contains at least two columns: 
 - Component_Id: This is the Application identifier
+- Component_Name: This is the Appliation name
 - Server_Name: This is the server associated with the given component_id.
 Note this parameter may become vestigial or replaced once there is an API to get this information.
 
