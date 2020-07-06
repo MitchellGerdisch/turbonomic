@@ -1,11 +1,12 @@
 /* 
- * Finds actions that improve RI utilization.
+ * Finds PERFORMANCE actions that improve cost.
+ * This may happen if the new instance type is a cheaper generation of instance type.
  */
 
 /* Auto call the function to get things going */
-getRIimprovingActions_xl()
+getCostImprovingActions_xl()
 
-async function getRIimprovingActions_xl() { 
+async function getCostImprovingActions_xl() { 
 	
 	console.log("")
 	console.log("**** Looking for RI-improving actions ... this may take a few minutes ...")
@@ -17,36 +18,34 @@ async function getRIimprovingActions_xl() {
 		return
 	}
 	
-	ri_improving_actions = await findRiImprovingActions(current_market)
+	cost_improving_actions = await findCostImprovingActions(current_market)
 	
-	if (ri_improving_actions.length == 0) {
-		console.log("*** NO RI UTILIZATION IMPROVING ACTIONS FOUND. ***")
+	if (cost_improving_actions.length == 0) {
+		console.log("*** NO COST IMPROVING PERFORMANCE ACTIONS FOUND. ***")
 	} else {
-		console.log("*** Found some RI utilization improving actions ...")
+		console.log("*** Found some cost improving performance actions ...")
 
 		csvContent = "data:text/csv;charset=utf-8,";
-		csvContent += "Instance Name,Account Name,Instance ID,Current RI Utilization,New RI Utilization,Action,Reason,Reason Description\n" 
-		
-		for (i = 0; i < ri_improving_actions.length; i++) {
-			ri_action = ri_improving_actions[i]
-			instance = ri_action.instance_name
-			instance_id = ri_action.instance_id
-			account = ri_action.account_name
-			current_ri = ri_action.current_ri_util
-			new_ri = ri_action.new_ri_util
-			action = ri_action.action
-			reason = ri_action.reason
-			reason_description = ri_action.reason_description
+		csvContent += "Instance Name,Account Name,Instance ID,Savings,Action,Reason,Reason Description\n" 
+			
+		for (i = 0; i < cost_improving_actions.length; i++) {
+			action = cost_improving_actions[i]
+			instance = action.instance_name
+			instance_id = action.instance_id
+			savings = action.savings
+			account = action.account_name
+			action = action.action
+			reason = action.reason
+			reason_description = action.reason_description
 			
 			console.log("Instance Name: "+ instance); 
 			console.log("- Account Name: "+ account);
 			console.log("- Instance ID: "+ instance_id);
-			console.log("- Current RI Utilization: "+ current_ri);
-			console.log("- New RI Utilization: " + new_ri);
+			console.log("- Savings: "+savings);
 			console.log("- Action: " + action);
 			console.log("- Reason: " + reason);
 			console.log("- Reason Description: " + reason_description);
-			csvContent += instance + "," + account + "," + instance_id + "," + current_ri + "," + new_ri + "," + action + "," + reason + "," + reason_description + "\n"
+			csvContent += instance + "," + account + "," + instance_id + "," + savings + "," + action + "," + reason + "," + reason_description + "\n"
 		}
 
 		console.log("*** Downloading CSV containing RI-improving actions.")
@@ -57,9 +56,9 @@ async function getRIimprovingActions_xl() {
 	}
 }
 
-async function findRiImprovingActions(market) {
+async function findCostImprovingActions(market) {
 	
-	/* Only care about cloud related resize type of actions */
+	/* Only care about cloud related resize type of actions that improve performance */
 	actions_body = {
 			"actionTypeList": [
 				"RESIZE",
@@ -67,6 +66,9 @@ async function findRiImprovingActions(market) {
 				"SCALE"
 			],
 			"environmentType": "CLOUD",
+			"riskSubCategoryList": [
+				"Performance Assurance"
+			],
 			"detailLevel": "EXECUTION"
 	}
 	
@@ -92,45 +94,28 @@ async function findRiImprovingActions(market) {
 		}
 	}
 	
-	ri_improving_actions = []
+	cost_improving_perf_actions = []
 	for (a = 0; a < all_actions.length; a++) {
 		if ((a%100) == 0) {
-			console.log("**** ... still looking for RI-improving actions ...")
+			console.log("**** ... still looking for actions ...")
 		}
 		action = all_actions[a]
+		savings = action.stats[0].value
 		
-		/* we need to get the details for the action to see RI coverage */
-		response = await fetch('/api/v3/actions/'+action.uuid+'/details')
-		action_details = await response.json()
-		
-		/* Check if any RI coverage information is available. */
-		if ((action_details.riCoverageBefore) && (action_details.riCoverageAfter)) {
-			/* do some math to see if RI usage improves because of this action */
-			before_ri_capacity = action_details.riCoverageBefore.capacity.avg
-			before_ri_usage = action_details.riCoverageBefore.value
-			before_ri_utilization = (before_ri_capacity == 0 ? 0 : Math.round((before_ri_usage/before_ri_capacity)*100))
-
-			after_ri_capacity = action_details.riCoverageAfter.capacity.avg
-			after_ri_usage = action_details.riCoverageAfter.value
-			after_ri_utilization = (after_ri_capacity == 0 ? 0 : Math.round((after_ri_usage/after_ri_capacity)*100))
-			
-			if (after_ri_utilization > before_ri_utilization) { 
-				/* we got a good one */
-				ri_improving_actions.push({
-					"instance_name": action.target.displayName,
-					"account_name": action.currentLocation.discoveredBy.displayName,
-					"instance_id": Object.values(action.target.vendorIds)[0],
-					"current_ri_util": before_ri_utilization,
-					"new_ri_util": after_ri_utilization,
-					"action": action.details,
-					"reason": action.risk.subCategory,
-					"reason_description": action.risk.description
-				})
-			}
+		if (savings > 0) {
+			cost_improving_perf_actions.push({
+				"instance_name": action.target.displayName,
+				"instance_id": action.target.uuid,
+				"account_name": action.currentLocation.discoveredBy.displayName,
+				"savings": savings,
+				"action": action.details,
+				"reason": action.risk.subCategory,
+				"reason_description": action.risk.description
+			})
 		}
 	}
 	
-	return ri_improving_actions
+	return cost_improving_perf_actions 
 }
 
 
