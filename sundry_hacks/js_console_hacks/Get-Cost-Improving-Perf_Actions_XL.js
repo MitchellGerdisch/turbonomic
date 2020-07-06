@@ -101,7 +101,7 @@ async function findCostImprovingActions(market) {
 		}
 		action = all_actions[a]
 		
-		if (action.hasOwnProperty(stats)) {
+		if (action.hasOwnProperty('stats')) {
 			savings = action.stats[0].value
 			
 			if (savings > 0) {
