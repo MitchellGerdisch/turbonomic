@@ -100,19 +100,21 @@ async function findCostImprovingActions(market) {
 			console.log("**** ... still looking for actions ...")
 		}
 		action = all_actions[a]
-		console.log("*** DEBUG: "+JSON.stringify(action))
-		savings = action.stats[0].value
 		
-		if (savings > 0) {
-			cost_improving_perf_actions.push({
-				"instance_name": action.target.displayName,
-				"instance_id": action.target.uuid,
-				"account_name": action.currentLocation.discoveredBy.displayName,
-				"savings": savings,
-				"action": action.details,
-				"reason": action.risk.subCategory,
-				"reason_description": action.risk.description
-			})
+		if (action.hasOwnProperty(stats)) {
+			savings = action.stats[0].value
+			
+			if (savings > 0) {
+				cost_improving_perf_actions.push({
+					"instance_name": action.target.displayName,
+					"instance_id": action.target.uuid,
+					"account_name": action.currentLocation.discoveredBy.displayName,
+					"savings": savings,
+					"action": action.details,
+					"reason": action.risk.subCategory,
+					"reason_description": action.risk.description
+				})
+			}
 		}
 	}
 	
