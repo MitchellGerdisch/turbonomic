@@ -37,15 +37,8 @@ Specify the name of the cluster group defined in Turbo for which to get the host
 Currently, this is the URL with the key that one gets when creating a Streaming DataSet set in PowerBI.
 (Eventually, this may be replaced with a PowerBI API credentials as configured via registering an app from dev.powerbi.com or a service prinicipal creds.)
 
-.PARAMETER csv_file
-Specify the path to a CSV that contains at least two columns: 
-- Component_Id: This is the Application identifier
-- Component_Name: This is the Appliation name
-- Server_Name: This is the server associated with the given component_id.
-Note this parameter may become vestigial or replaced once there is an API to get this information.
-
 CROSS-COMPLIATION NOTES
-env GOOS=windows GOARCH=amd64 go build ./push_turbo-actions.go
+env GOOS=windows GOARCH=amd64 go build ./push_turbo_cluster_actions.go
 
 */
 
@@ -190,7 +183,7 @@ func pushPowerBiData(clusterNameMap map[string]string, clusterActionsMap map[str
 		res, _:= client.Do(req)
 		defer res.Body.Close()
 		
-		fmt.Printf("... sent %d action(s) for cluster %s\n", action_count, clusterName)
+		fmt.Printf("... sent %d records(s) for cluster %s\n", action_count, clusterName)
 	}
 }
 
@@ -203,9 +196,9 @@ func getHostActions (turbo_instance string, turbo_user string, turbo_password st
 	// get auth token
 	auth := turboLogin(turbo_instance, turbo_user, turbo_password) 
 	
+	fmt.Printf("... getting cluster list for group, %s ...\n", cluster_group_name)
 	// Find the UUID for the group
 	group_uuid := getGroupId(turbo_instance, cluster_group_name, auth)
-	
 	// Use the Group UUID to get the cluster members of the group
 	clusterNameMap := getGroupMembers(turbo_instance, auth, group_uuid)
 	
@@ -213,6 +206,7 @@ func getHostActions (turbo_instance string, turbo_user string, turbo_password st
 	var clusterActionsMap map[string][]Action
 	clusterActionsMap = make(map[string][]Action)
 	for clusterUuid,clusterName := range clusterNameMap {
+		fmt.Printf("... getting actions for cluster, %s ...\n", clusterName)
 
 		base_url := "https://"+turbo_instance+"/vmturbo/rest/groups/"+clusterUuid+"/actions"
 		url := base_url
@@ -405,7 +399,7 @@ func getGroupId(turbo_instance string, cluster_group_name string, auth string) s
 // Login to turbo
 func turboLogin(turbo_instance string, turbo_user string, turbo_password string) string {
 
-	fmt.Println("Authenticating to Turbonomic instance, "+turbo_instance) 
+	fmt.Println("... authenticating to Turbonomic instance, "+turbo_instance) 
 
   	url := "https://"+ turbo_instance +"/vmturbo/rest/login"
   	method := "POST"
