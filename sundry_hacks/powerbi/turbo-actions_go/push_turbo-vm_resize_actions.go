@@ -19,7 +19,7 @@ Requires a Power BI streaming dataset defined with the following fields:
 - Category (Text)
 
 .EXAMPLE
-PushTurboActions_PowerBI.ps1 -TurboInstance turbonomic.mycompany.com -TurboCredential $TurboCred -PowerBiCredential $PowerBiKey -AppServerMapCsv appserver.csv
+push_turbo-vm_resize_actions -turbo_instance turbonomic.mycompany.com -turbo_user USERNAME -turbo_password PASSWORD -powerbi_stream_url POWERBI_DATASET_URL -csv_file APPSERVER.csv
 For the servers associated with each applicatin found in the provided CSV, this script will push a separate row of data to the given Power BI stream 
 where each row provides the application, the server and action data.
 
@@ -101,7 +101,7 @@ func main() {
 	// 2.2 MINOR VERSION NOTE: Changed PowerBI API logic to send sets of actions for a given application instead of one at a time for each server.
 	// 2.3 MINOR VERSION NOTE: Updated code to build map of app to server to allow for more efficient processing.
 	version := "2.3" 
-	fmt.Println("push_turbo-actions version "+version)
+	fmt.Println("push_turbo-vm_resize_actions version "+version)
 
 	// Process command line arguments
 	turbo_user := flag.String("turbo_user", "", "Turbo Username")
@@ -109,7 +109,6 @@ func main() {
 	turbo_instance := flag.String("turbo_instance", "", "Turbo IP or FQDN")
 	csv_file := flag.String("csv_file", "", "CSV File containing App to Server mapping - \"Component_id\" and \"Server_Name\" columns required")
 	powerbi_stream_url := flag.String("powerbi_stream_url", "", "URL for the PowerBI Stream Dataset")
-	//action_type := flag.String("action_type", "", "(Optional) Actions to output. Options: TBD")
 
 	flag.Parse()
 	
