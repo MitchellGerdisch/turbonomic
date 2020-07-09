@@ -48,7 +48,7 @@ Flag which action_type(s) to include in the output.
 Options: TBD
 
 CROSS-COMPLIATION NOTES
-env GOOS=windows GOARCH=amd64 go build ./push_turbo-actions.go
+env GOOS=windows GOARCH=amd64 go build ./push_turbo_resize_actions.go
 
 */
 
