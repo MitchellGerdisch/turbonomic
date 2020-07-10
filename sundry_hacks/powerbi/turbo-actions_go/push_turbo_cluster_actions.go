@@ -73,8 +73,8 @@ type Action struct {
 
 func main() {
 
-	// 0.1 Version: Initial version
-	version := "0.1"
+	// 1.0 version: Initial version
+	version := "1.0"
 	fmt.Println("push_turbo-cluster-host_actions version "+version)
 
 	// Process command line arguments
@@ -166,12 +166,14 @@ func pushPowerBiData(clusterNameMap map[string]string, clusterActionsMap map[str
 			}
 	  	}
 	  	payload = payload + "]"
-		client := &http.Client {}
-		req, err := http.NewRequest(method, powerbi_url, strings.NewReader(payload))
-		if err != nil {
-			fmt.Println(err)
-		}
-		req.Header.Add("Content-Type", "application/json")
+	  	
+	  	if (action_count > 0) {
+			client := &http.Client {}
+			req, err := http.NewRequest(method, powerbi_url, strings.NewReader(payload))
+			if err != nil {
+				fmt.Println(err)
+			}
+			req.Header.Add("Content-Type", "application/json")
 		
 // 		// For debugging HTTP Call
 // 		requestDump, err := httputil.DumpRequest(req, true)
@@ -179,11 +181,18 @@ func pushPowerBiData(clusterNameMap map[string]string, clusterActionsMap map[str
 // 				fmt.Println(err)
 // 		}
 // 		fmt.Println(string(requestDump))
+// 		// END DEBUGGING
 	
-		res, _:= client.Do(req)
-		defer res.Body.Close()
-		
-		fmt.Printf("... sent %d records(s) for cluster %s\n", action_count, clusterName)
+			res, _:= client.Do(req)
+			defer res.Body.Close()
+			
+			if (res.StatusCode != 200) {
+				fmt.Printf("### ERROR ### sending %d records for cluster %s\n", action_count, clusterName) 
+				fmt.Println("### HTML ERROR ### ", res.StatusCode, http.StatusText(res.StatusCode))
+			} else {
+				fmt.Printf("... sent %d records(s) for cluster %s\n", action_count, clusterName)
+			}
+		}
 	}
 }
 

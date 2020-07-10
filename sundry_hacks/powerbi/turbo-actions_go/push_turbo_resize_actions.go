@@ -100,7 +100,8 @@ func main() {
 	// 2.1 MINOR VERSION NOTE: Fixed bug in HTTP payload when calling API for actions.
 	// 2.2 MINOR VERSION NOTE: Changed PowerBI API logic to send sets of actions for a given application instead of one at a time for each server.
 	// 2.3 MINOR VERSION NOTE: Updated code to build map of app to server to allow for more efficient processing.
-	version := "2.3" 
+	// 2.4 MINOR VERSION NOTE: Adds return code error checking when calling PowerBi API
+	version := "2.4" 
 	fmt.Println("push_turbo-vm_resize_actions version "+version)
 
 	// Process command line arguments
@@ -286,12 +287,15 @@ func pushPowerBiData(appId2Name map[string]string, appId2Servers map[string][]st
   			}
 	  	}
 	  	payload = payload + "]"
-		client := &http.Client {}
-		req, err := http.NewRequest(method, powerbi_url, strings.NewReader(payload))
-		if err != nil {
-			fmt.Println(err)
-		}
-		req.Header.Add("Content-Type", "application/json")
+	  	
+	    if (app_action_count > 0) {
+	  	
+			client := &http.Client {}
+			req, err := http.NewRequest(method, powerbi_url, strings.NewReader(payload))
+			if err != nil {
+				fmt.Println(err)
+			}
+			req.Header.Add("Content-Type", "application/json")
 		
 // 		// For debugging HTTP Call
 // 		requestDump, err := httputil.DumpRequest(req, true)
@@ -300,10 +304,16 @@ func pushPowerBiData(appId2Name map[string]string, appId2Servers map[string][]st
 // 		}
 // 		fmt.Println(string(requestDump))
 	
-		res, _:= client.Do(req)
-		defer res.Body.Close()
-		
-		fmt.Printf("... sent %d action(s) for application %s\n", app_action_count, appName)
+			res, _:= client.Do(req)
+			defer res.Body.Close()
+			
+			if (res.StatusCode != 200) {
+				fmt.Printf("### ERROR ### sending %d records for application %s\n:", app_action_count, appName) 
+				fmt.Println("### HTML ERROR ### ", res.StatusCode, http.StatusText(res.StatusCode))
+			} else {
+				fmt.Printf("... sent %d action(s) for application %s\n", app_action_count, appName)
+			}
+		}
 	}
 }
 
