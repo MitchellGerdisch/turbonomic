@@ -18,8 +18,9 @@ async function CreateClusterGroups(param) {
 	clusterslist = await getClustersList()
 	if (clusterslist.length > 0) {
 		for (a = 0; a < clusterslist.length; a++) {
-			if (clusterslist[a]) {
+			if (clusterslist[a].displayName) {
 				item = clusterslist[a]
+				console.log("### DEBUG: "+item.displayName)
 				await buildClusterGroups(item.displayName, item.uuid)
 				console.log("")
 			}
