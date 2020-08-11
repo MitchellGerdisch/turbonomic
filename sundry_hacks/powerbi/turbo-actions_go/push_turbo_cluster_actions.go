@@ -140,9 +140,11 @@ func pushPowerBiData(clusterNameMap map[string]string, clusterActionsMap map[str
 	timeString := t.Format(time.RFC3339)
   	method := "POST"
 	
+	apiCount := 0
 	for clusterUuid,clusterName := range clusterNameMap {
 		var payload string
 		action_count := 0
+		apiCount++
 		for _,action := range clusterActionsMap[clusterUuid] {
 			timestamp_part := "\"Timestamp\": \""+timeString+"\""
 			clustername_part := "\"Cluster_Name\": \""+clusterName+"\""
@@ -191,6 +193,11 @@ func pushPowerBiData(clusterNameMap map[string]string, clusterActionsMap map[str
 				fmt.Println("### HTML ERROR ### ", res.StatusCode, http.StatusText(res.StatusCode))
 			} else {
 				fmt.Printf("... sent %d records(s) for cluster %s\n", action_count, clusterName)
+			}
+			
+			if ((apiCount % 110) == 0) {
+				fmt.Printf(" ... made %d API calls. Sleeping for 1 minute to avoid overloading PowerBI API limits ...", apiCount)
+				time.Sleep(1 * time.Minute)
 			}
 		}
 	}

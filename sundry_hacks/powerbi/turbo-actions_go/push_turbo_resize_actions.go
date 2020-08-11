@@ -101,7 +101,9 @@ func main() {
 	// 2.2 MINOR VERSION NOTE: Changed PowerBI API logic to send sets of actions for a given application instead of one at a time for each server.
 	// 2.3 MINOR VERSION NOTE: Updated code to build map of app to server to allow for more efficient processing.
 	// 2.4 MINOR VERSION NOTE: Adds return code error checking when calling PowerBi API
-	version := "2.4" 
+	// 2.5 MINOR VERSION NOTE: Added check for responseAction["details"] to see if nil before trying to use.
+	// 2.6 MINOR VERSION NOTE: Added throttling to PowerBI so that after every 110 POSTs to the API it sleeps for a minute. PowerBI allows 120 POSTs per minute.
+	version := "2.6" 
 	fmt.Println("push_turbo-vm_resize_actions version "+version)
 
 	// Process command line arguments
@@ -260,8 +262,10 @@ func pushPowerBiData(appId2Name map[string]string, appId2Servers map[string][]st
 	timeString := t.Format(time.RFC3339)
   	method := "POST"
 	
+	appCount := 0
 	for appId,appName := range appId2Name {
 		var payload string
+		appCount++
 		app_action_count := 0
 		for _,serverName := range appId2Servers[appId] {
 			for _,action := range allServerActions[serverName] {
@@ -312,6 +316,11 @@ func pushPowerBiData(appId2Name map[string]string, appId2Servers map[string][]st
 				fmt.Println("### HTML ERROR ### ", res.StatusCode, http.StatusText(res.StatusCode))
 			} else {
 				fmt.Printf("... sent %d action(s) for application %s\n", app_action_count, appName)
+			}
+			
+			if ((appCount % 110) == 0) {
+				fmt.Printf(" ... made %d API calls. Sleeping for 1 minute to avoid overloading PowerBI API limits ...", appCount)
+				time.Sleep(1 * time.Minute)
 			}
 		}
 	}
@@ -478,7 +487,11 @@ func getAllActions (turbo_instance string, turbo_user string, turbo_password str
 			action.reason = responseAction["risk"].(map[string]interface{})["description"].(string)
 			action.severity = responseAction["risk"].(map[string]interface{})["severity"].(string)
 			action.category = responseAction["risk"].(map[string]interface{})["subCategory"].(string)
-			action.actionDetails = responseAction["details"].(string)
+			if (responseAction["details"] == nil) {
+				action.actionDetails = "NO TURBO ACTION DETAILS FOUND."
+			} else {
+				action.actionDetails = responseAction["details"].(string)
+			}
 			if  (responseAction["target"].(map[string]interface{})["environmentType"] == "CLOUD") {
 				actionFrom = responseAction["currentEntity"].(map[string]interface{})["displayName"].(string)
 				actionTo = responseAction["newEntity"].(map[string]interface{})["displayName"].(string)
