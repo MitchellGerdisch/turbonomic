@@ -103,7 +103,8 @@ func main() {
 	// 2.4 MINOR VERSION NOTE: Adds return code error checking when calling PowerBi API
 	// 2.5 MINOR VERSION NOTE: Added check for responseAction["details"] to see if nil before trying to use.
 	// 2.6 MINOR VERSION NOTE: Added throttling to PowerBI so that after every 110 POSTs to the API it sleeps for a minute. PowerBI allows 120 POSTs per minute.
-	version := "2.6" 
+	// 2.7 MINOR VERSION NOTE: Added check for nil target name in action.
+	version := "2.7" 
 	fmt.Println("push_turbo-vm_resize_actions version "+version)
 
 	// Process command line arguments
@@ -426,6 +427,8 @@ func getAllActions (turbo_instance string, turbo_user string, turbo_password str
 	allResizeActions = make(map[string][]Action)
 	allActionServerUuids = make(map[string][]string)
 
+	nilTargetnameActions := 0
+	totalActions := 0
 	
 	done := false
 	for (!done) {
@@ -474,12 +477,20 @@ func getAllActions (turbo_instance string, turbo_user string, turbo_password str
 		var allActions []Action
 		var riskcommodity string
 		var fromval, toval float64
+
 		for _, responseAction := range responseActions {
 			var serverName, serverUuid string
 			var action Action
 			var actionFrom, actionTo string
 			
-			serverName = responseAction["target"].(map[string]interface{})["displayName"].(string)
+			totalActions++
+			if (responseAction["target"].(map[string]interface{})["displayName"] != nil) {
+				serverName = responseAction["target"].(map[string]interface{})["displayName"].(string)
+			} else {
+				nilTargetnameActions++
+				serverName = "TURBO SERVERNAME NOT FOUND"
+			}
+
 			serverUuid = responseAction["target"].(map[string]interface{})["uuid"].(string)
 	
 			action.actionUuid = responseAction["uuid"].(string)
@@ -488,7 +499,7 @@ func getAllActions (turbo_instance string, turbo_user string, turbo_password str
 			action.severity = responseAction["risk"].(map[string]interface{})["severity"].(string)
 			action.category = responseAction["risk"].(map[string]interface{})["subCategory"].(string)
 			if (responseAction["details"] == nil) {
-				action.actionDetails = "NO TURBO ACTION DETAILS FOUND."
+				action.actionDetails = "TURBO ACTION CONTAINED NO DETAILS."
 			} else {
 				action.actionDetails = responseAction["details"].(string)
 			}
@@ -526,6 +537,7 @@ func getAllActions (turbo_instance string, turbo_user string, turbo_password str
 			allResizeActions[serverName] = allActions
 			// add the server uuid to the map in case it's handy later.
 			allActionServerUuids[serverName] = append(allActionServerUuids[serverName], serverUuid)
+			
 
 		}
 
@@ -539,6 +551,10 @@ func getAllActions (turbo_instance string, turbo_user string, turbo_password str
 			//fmt.Println("DONE GETTING ACTIONS")
 		}
 	}
+	
+	// print out how many total actions were found and of those how many didn't have target names
+	fmt.Printf("### Total Actions Found: %d\n",totalActions)
+	fmt.Printf("### Bad Name Actions Found: %d\n",nilTargetnameActions)
 	
 	return allResizeActions, allActionServerUuids 
 }	
