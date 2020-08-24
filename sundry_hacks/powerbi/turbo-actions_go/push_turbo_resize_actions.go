@@ -104,7 +104,8 @@ func main() {
 	// 2.5 MINOR VERSION NOTE: Added check for responseAction["details"] to see if nil before trying to use.
 	// 2.6 MINOR VERSION NOTE: Added throttling to PowerBI so that after every 110 POSTs to the API it sleeps for a minute. PowerBI allows 120 POSTs per minute.
 	// 2.7 MINOR VERSION NOTE: Added check for nil target name in action.
-	version := "2.7" 
+	// 2.8 MINOR VERSION NOTE: Added more error checking
+	version := "2.8.1" 
 	fmt.Println("push_turbo-vm_resize_actions version "+version)
 
 	// Process command line arguments
@@ -428,7 +429,7 @@ func getAllActions (turbo_instance string, turbo_user string, turbo_password str
 	allActionServerUuids = make(map[string][]string)
 
 	done := false
-	skippedActions := 0
+	badActions := 0
 	for (!done) {
 		// create and make the request
 		req, err := http.NewRequest(method, url, bytes.NewBuffer(payload))
@@ -466,7 +467,7 @@ func getAllActions (turbo_instance string, turbo_user string, turbo_password str
     		if e, ok := err.(*json.SyntaxError); ok {
         		fmt.Printf("#### ERROR syntax error at byte offset %d\n", e.Offset)
     		}
-    		fmt.Printf("#### ERROR response: %q\n", body)
+    		//DUMPS TOO MUCH DATA: fmt.Printf("#### ERROR response: %q\n", body)
  		}
 		
 		
@@ -479,92 +480,120 @@ func getAllActions (turbo_instance string, turbo_user string, turbo_password str
 			var serverName, serverUuid string
 			var action Action
 			var actionFrom, actionTo string
+			badAction := false
 			
-			if ((responseAction["target"].(map[string]interface{})["displayName"] == nil) || 
-				(responseAction["target"].(map[string]interface{})["uuid"] == nil) ||
-				(responseAction["uuid"] == nil) ||
-				(responseAction["actionType"] == nil) ||
-				(responseAction["risk"].(map[string]interface{})["description"] == nil) ||
-				(responseAction["risk"].(map[string]interface{})["severity"] == nil) ||
-				(responseAction["risk"].(map[string]interface{})["subCategory"] == nil) ||
-				(responseAction["details"] == nil) ||
-				(responseAction["currentEntity"].(map[string]interface{})["displayName"] == nil) ||
-				(responseAction["newEntity"].(map[string]interface{})["displayName"] == nil) ||
-				(responseAction["risk"].(map[string]interface{})["reasonCommodity"] == nil) ||
-				(responseAction["currentValue"] == nil) ||
-				(responseAction["resizeToValue"] == nil)) {
-				
-				skippedActions++
-			
-				/***
-				actionId := "UNKNOWN" 
-				if (responseAction["uuid"] != nil) {
-					actionId = responseAction["uuid"].(string)
-				}
-				targetName := "UNKNOWN" 
-				if (responseAction["target"].(map[string]interface{})["displayName"] != nil) {
-					targetName = responseAction["target"].(map[string]interface{})["displayName"].(string)
-				}	
-				fmt.Printf("*** SKIPPING action, uuid=%s, for target, name=%s, due to missing data.\n",actionId,targetName)
-				****/
-			} else {
-	
+			if (responseAction["target"].(map[string]interface{})["displayName"] != nil) {
 				serverName = responseAction["target"].(map[string]interface{})["displayName"].(string)
-				serverUuid = responseAction["target"].(map[string]interface{})["uuid"].(string)
-				action.actionUuid = responseAction["uuid"].(string)
-				action.actionType = responseAction["actionType"].(string)
-				action.reason = responseAction["risk"].(map[string]interface{})["description"].(string)
-				action.severity = responseAction["risk"].(map[string]interface{})["severity"].(string)
-				action.category = responseAction["risk"].(map[string]interface{})["subCategory"].(string)
-				action.actionDetails = responseAction["details"].(string)
-	
-				if  (responseAction["target"].(map[string]interface{})["environmentType"] == "CLOUD") {
-					actionFrom = responseAction["currentEntity"].(map[string]interface{})["displayName"].(string)
-					actionTo = responseAction["newEntity"].(map[string]interface{})["displayName"].(string)
-				} else {
-					riskcommodity = responseAction["risk"].(map[string]interface{})["reasonCommodity"].(string)
-					if (riskcommodity == "VCPU") {
-						// Get CPU values (in float)
-						fromval, _ = strconv.ParseFloat(responseAction["currentValue"].(string), 32)
-						toval, _ = strconv.ParseFloat(responseAction["resizeToValue"].(string), 32)
-						// Convert from float to int
-						actionFrom = strconv.Itoa(int(fromval))
-						actionTo = strconv.Itoa(int(toval))
-					} else if (riskcommodity == "VMem") {
-						fromval, _ = strconv.ParseFloat(responseAction["currentValue"].(string), 32)
-						// Convert to GB
-						fromval = (fromval/(1024*1024))
-						toval, _ = strconv.ParseFloat(responseAction["resizeToValue"].(string), 32)
-						// Convert to GB
-						toval = (toval/(1024*1024))
-						// Convert from float to int
-						actionFrom = strconv.Itoa(int(fromval))
-						actionTo = strconv.Itoa(int(toval))
-					} else {
-						actionFrom = "NA"
-						actionTo = "NA"
-					}
-		
-				}
-				action.actionFrom = actionFrom
-				action.actionTo = actionTo
-				allActions = append(allResizeActions[serverName], action)
-				allResizeActions[serverName] = allActions
-				// add the server uuid to the map in case it's handy later.
-				allActionServerUuids[serverName] = append(allActionServerUuids[serverName], serverUuid)
-			}	
+			} else {
+				serverName = "UNKNOWN"
+				badAction = true
+			}
 
+			if (responseAction["target"].(map[string]interface{})["uuid"] != nil) {
+				serverUuid = responseAction["target"].(map[string]interface{})["uuid"].(string)
+			} else {
+				serverUuid = "UNKNOWN"
+				badAction = true
+			}
+
+			if (responseAction["uuid"] != nil) {
+				action.actionUuid = responseAction["uuid"].(string)
+			} else {
+				action.actionUuid = "UNKNOWN"
+				badAction = true
+			}
+
+			if (responseAction["actionType"] != nil) {
+				action.actionType = responseAction["actionType"].(string)
+			} else {
+				action.actionType = "UNKNOWN"
+				badAction = true
+			}
+			
+			if (responseAction["risk"].(map[string]interface{})["description"] != nil) {
+				action.reason = responseAction["risk"].(map[string]interface{})["description"].(string)
+			} else {
+				action.reason = "UNKNOWN"
+				badAction = true
+			}
+			
+			if (responseAction["risk"].(map[string]interface{})["severity"] != nil) {
+				action.severity = responseAction["risk"].(map[string]interface{})["severity"].(string)
+			} else {
+				action.severity = "UNKNOWN"
+				badAction = true
+			}
+
+			if (responseAction["risk"].(map[string]interface{})["subCategory"] != nil) {
+				action.category = responseAction["risk"].(map[string]interface{})["subCategory"].(string)
+			} else {
+				action.category = "UNKNOWN"
+				badAction = true
+			}
+
+			if (responseAction["details"] != nil) {
+				action.actionDetails = responseAction["details"].(string)
+			} else {
+				action.actionDetails = "UNKNOWN"
+				badAction = true
+			}
+
+			if  (responseAction["target"].(map[string]interface{})["environmentType"] == "CLOUD") {
+				actionFrom = responseAction["currentEntity"].(map[string]interface{})["displayName"].(string)
+				actionTo = responseAction["newEntity"].(map[string]interface{})["displayName"].(string)
+			} else {
+				riskcommodity = "UNKNOWN"
+				if (responseAction["risk"].(map[string]interface{})["reasonCommodity"] != nil) {
+					riskcommodity = responseAction["risk"].(map[string]interface{})["reasonCommodity"].(string)
+				}
+
+				if (riskcommodity == "VCPU") {
+					// Get CPU values (in float)
+					fromval, _ = strconv.ParseFloat(responseAction["currentValue"].(string), 32)
+					toval, _ = strconv.ParseFloat(responseAction["resizeToValue"].(string), 32)
+					// Convert from float to int
+					actionFrom = strconv.Itoa(int(fromval))
+					actionTo = strconv.Itoa(int(toval))
+				} else if (riskcommodity == "VMem") {
+					fromval, _ = strconv.ParseFloat(responseAction["currentValue"].(string), 32)
+					// Convert to GB
+					fromval = (fromval/(1024*1024))
+					toval, _ = strconv.ParseFloat(responseAction["resizeToValue"].(string), 32)
+					// Convert to GB
+					toval = (toval/(1024*1024))
+					// Convert from float to int
+					actionFrom = strconv.Itoa(int(fromval))
+					actionTo = strconv.Itoa(int(toval))
+				} else {
+					actionFrom = "NA"
+					actionTo = "NA"
+				}
+			}
+			action.actionFrom = actionFrom
+			action.actionTo = actionTo
+			allActions = append(allResizeActions[serverName], action)
+			allResizeActions[serverName] = allActions
+			// add the server uuid to the map in case it's handy later.
+			allActionServerUuids[serverName] = append(allActionServerUuids[serverName], serverUuid)	
+			
+			if (badAction) {
+				badActions++
+			}
 		}
 
 		// Are there more actions to get from the API?
 		cursor := res.Header.Get("x-next-cursor")
 		if (len(cursor) > 0) {
 			url = base_url + "?cursor="+cursor
-			fmt.Printf("### Skipped %d actions so far.\n", skippedActions)
 			fmt.Printf("... still getting actions (cursor=%s) ...\n",cursor)
+			if (badActions > 0) {
+				fmt.Printf("### Found %d poorly formatted actions so far.\n", badActions)
+			}
 		} else {
 			done = true
-			fmt.Printf("\n#####\n#### SKIPPED a total of %d actions due to missing data. #####\n#####\n",skippedActions)
+			if (badActions > 0) {
+				fmt.Printf("\n#####\n#### Found a total of %d actions with missing data. #####\n#####\n",badActions)
+			}
 			//fmt.Println("DONE GETTING ACTIONS")
 		}
 	}
