@@ -148,7 +148,7 @@ async function getVMs() {
 	 	 "environmentType": "ONPREM",
 	 	 "scope": null
 	 }
-	 response = await fetch('/api/v2/search/?ascending=false&disable_hateoas=true&order_by=severity&q=', {
+	 response = await fetch('/vmturbo/rest/search/?ascending=false&disable_hateoas=true&order_by=severity&q=', {
 	 	 method: 'POST',
 	 	 body: JSON.stringify(request_body),
 	 	 headers: {
@@ -162,7 +162,7 @@ async function getVMs() {
  * Gets the number of vCPUs for a given VM.
  */
 async function getVmCpuNum(uuid) {
-	response = await fetch('/api/v2/entities/'+uuid+'/aspects/virtualMachineAspect')
+	response = await fetch('/vmturbo/rest/entities/'+uuid+'/aspects/virtualMachineAspect')
 	vmaspect = await response.json()
 	return vmaspect.numVCPUs
 }
