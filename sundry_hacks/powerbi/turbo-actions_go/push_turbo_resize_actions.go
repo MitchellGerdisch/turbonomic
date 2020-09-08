@@ -105,7 +105,8 @@ func main() {
 	// 2.6 MINOR VERSION NOTE: Added throttling to PowerBI so that after every 110 POSTs to the API it sleeps for a minute. PowerBI allows 120 POSTs per minute.
 	// 2.7 MINOR VERSION NOTE: Added check for nil target name in action.
 	// 2.8 MINOR VERSION NOTE: Added more error checking
-	version := "2.8.1" 
+	// 2.9 MINOR VERSION NOTE: Slight modification to how PowerBI API throttling is handled.
+	version := "2.9.1"
 	fmt.Println("push_turbo-vm_resize_actions version "+version)
 
 	// Process command line arguments
@@ -264,10 +265,9 @@ func pushPowerBiData(appId2Name map[string]string, appId2Servers map[string][]st
 	timeString := t.Format(time.RFC3339)
   	method := "POST"
 	
-	appCount := 0
+	powerBiApiCount := 0
 	for appId,appName := range appId2Name {
 		var payload string
-		appCount++
 		app_action_count := 0
 		for _,serverName := range appId2Servers[appId] {
 			for _,action := range allServerActions[serverName] {
@@ -313,6 +313,7 @@ func pushPowerBiData(appId2Name map[string]string, appId2Servers map[string][]st
 			res, _:= client.Do(req)
 			defer res.Body.Close()
 			
+			
 			if (res.StatusCode != 200) {
 				fmt.Printf("### ERROR ### sending %d records for application %s\n:", app_action_count, appName) 
 				fmt.Println("### HTML ERROR ### ", res.StatusCode, http.StatusText(res.StatusCode))
@@ -320,9 +321,11 @@ func pushPowerBiData(appId2Name map[string]string, appId2Servers map[string][]st
 				fmt.Printf("... sent %d action(s) for application %s\n", app_action_count, appName)
 			}
 			
-			if ((appCount % 110) == 0) {
-				fmt.Printf(" ... made %d API calls. Sleeping for 1 minute to avoid overloading PowerBI API limits ...", appCount)
-				time.Sleep(1 * time.Minute)
+			powerBiApiCount++
+ 			if ((powerBiApiCount % 110) == 0) {
+				fmt.Printf("... made %d API calls. SLEEPING for 70 seconds to avoid overloading PowerBI API limits ...", powerBiApiCount)
+				time.Sleep(70 * time.Second)
+				fmt.Printf(" continuing ...\n")
 			}
 		}
 	}
